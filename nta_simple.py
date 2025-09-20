@@ -9,14 +9,18 @@ url = f"https://www3.septa.org/api/NextToArrive/index.php?req1={origin}&req2={de
 resp = requests.get(url)
 data = resp.json()
 
-# NTA returns a list of trips; take the first one
-trip = data[0]
+# NTA returns a list of trips; iterate and print
+for i in range(len(data)):
+    trip = data[i]
 
-dep_time = trip.get("orig_departure_time") or trip.get("depart_time")
-arr_time = trip.get("orig_arrival_time") or trip.get("arrival_time")
-status = trip.get("orig_delay") or trip.get("status")
+    dep_time = trip.get("orig_departure_time")
+    arr_time = trip.get("orig_arrival_time")
+    status = trip.get("orig_delay")
 
-print(f"{origin} → {destination}")
-print(f"Departs: {dep_time}")
-print(f"Arrives: {arr_time}")
-print(f"Status:  {status}")
+    print("=" * 40)
+    print(f"{origin} > {destination}")
+    print(f"Departs: {dep_time}")
+    print(f"Arrives: {arr_time}")
+    print(f"Status:  {status}")
+    print("=" * 40)
+    print()
