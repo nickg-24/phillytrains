@@ -8,7 +8,7 @@ import datetime
 origin = "Conshohocken"
 destination = "Suburban Station"
 n = 2
-DEBUG = 2  # 0 = clean, 1 = medium, 2 = verbose
+DEBUG = 1  # 0 = clean, 1 = medium, 2 = verbose
 
 # GTFS-RT VehiclePosition status map
 STATUS_MAP = {
@@ -19,7 +19,6 @@ STATUS_MAP = {
 
 # --- Helper: format GTFS HH:MM:SS into AM/PM ---
 def format_gtfs_time(timestr, service_date):
-    """Convert GTFS HH:MM:SS to datetime with AM/PM string, handling 24+ hours."""
     h, m, s = map(int, timestr.split(":"))
     day_offset = h // 24
     h = h % 24
@@ -74,12 +73,14 @@ with rail_zip.open("stop_times.txt") as f:
 for tid in trip_stops:
     trip_stops[tid].sort(key=lambda x: x[0])
 
-# trips.txt → service_id
+# trips.txt → service_id + route_id
 trip_service = {}
+trip_route = {}
 with rail_zip.open("trips.txt") as f:
     reader = csv.DictReader(io.TextIOWrapper(f, "utf-8"))
     for row in reader:
         trip_service[row["trip_id"]] = row["service_id"]
+        trip_route[row["trip_id"]] = row["route_id"]
 
 # calendar.txt
 calendar = {}
@@ -99,7 +100,7 @@ with rail_zip.open("calendar_dates.txt") as f:
         exception = row["exception_type"]
         if service_id not in calendar_dates:
             calendar_dates[service_id] = {}
-        calendar_dates[service_id][date] = exception  # 1=added, 2=removed
+        calendar_dates[service_id][date] = exception
 
 # --- Step 5: Service Alerts feed ---
 alerts_url = "https://www3.septa.org/gtfsrt/septarail-pa-us/Service/rtServiceAlerts.pb"
@@ -107,25 +108,53 @@ resp = requests.get(alerts_url)
 alerts_feed = gtfs_realtime_pb2.FeedMessage()
 alerts_feed.ParseFromString(resp.content)
 
+# --- Determine stop_ids for origin/destination ---
+origin_stop_ids = [sid for sid, name in stop_lookup.items() if name == origin]
+dest_stop_ids = [sid for sid, name in stop_lookup.items() if name == destination]
+
+# --- Dynamically infer route_id ---
+nta_route_id = None
+for trip_id, stops in trip_stops.items():
+    o = d = None
+    for seq, sid, dep in stops:
+        if sid in origin_stop_ids and o is None:
+            o = (seq, sid)
+        if sid in dest_stop_ids and o and seq > o[0] and d is None:
+            d = (seq, sid)
+    if o and d:
+        nta_route_id = trip_route.get(trip_id)
+        if nta_route_id:
+            break
+
+if DEBUG >= 1:
+    print(f"[DEBUG] Origin stops: {origin_stop_ids}, Dest stops: {dest_stop_ids}")
+    print(f"[DEBUG] Inferred route_id: {nta_route_id}")
+
+# --- Filter alerts relevant to this route/stops ---
 alerts_list = []
 for entity in alerts_feed.entity:
     if entity.HasField("alert"):
         alert = entity.alert
-        # Pull description text if available
-        if alert.description_text and alert.description_text.translation:
+        applies = False
+        for ie in alert.informed_entity:
+            if nta_route_id and ie.route_id == nta_route_id:
+                applies = True
+            if ie.stop_id in origin_stop_ids or ie.stop_id in dest_stop_ids:
+                applies = True
+        if not alert.informed_entity:  # global
+            applies = True
+        if applies and alert.description_text.translation:
             desc = alert.description_text.translation[0].text
             alerts_list.append(desc)
 
 if DEBUG >= 1:
-    print(f"[DEBUG] Loaded {len(alerts_list)} alerts")
+    print(f"[DEBUG] Loaded {len(alerts_list)} filtered alerts")
 
 # --- Helper: check if service runs on date ---
 def service_active(service_id, date):
     date_str = date.strftime("%Y%m%d")
     if service_id in calendar_dates and date_str in calendar_dates[service_id]:
         exc = calendar_dates[service_id][date_str]
-        if DEBUG >= 2:
-            print(f"Service {service_id} has exception {exc} on {date_str}")
         return exc == "1"
     if service_id not in calendar:
         return False
@@ -138,10 +167,10 @@ def service_active(service_id, date):
     weekdays = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
     return row[weekdays[weekday]] == "1"
 
-# --- Helper: find first trip after midnight for origin→destination ---
+# --- Helper: find first trip after midnight ---
 def find_first_trip_after(date, origin_name, dest_name):
-    origin_ids = [sid for sid,name in stop_lookup.items() if name == origin_name]
-    dest_ids = [sid for sid,name in stop_lookup.items() if name == dest_name]
+    origin_ids = [sid for sid, name in stop_lookup.items() if name == origin_name]
+    dest_ids = [sid for sid, name in stop_lookup.items() if name == dest_name]
     best_time = None
     best_trip = None
     for trip_id, stops in trip_stops.items():
@@ -205,8 +234,6 @@ else:
                         cs = vp.current_stop_sequence
                         st = vp.current_status
                         sid = vp.stop_id
-                        if DEBUG >= 2:
-                            print(f"VP match {trip_id}, status={st} ({STATUS_MAP.get(st,'UNKNOWN')}), stop_seq={cs}, stop_id={sid}")
                         if st == 1:  # STOPPED_AT
                             last_station = stop_lookup.get(sid, sid)
                         elif st == 0:  # IN_TRANSIT_TO
@@ -227,9 +254,12 @@ else:
         print(f"Status:  {status}")
         if last_station:
             print(f"Last location: {last_station}")
-        if alerts_list:
-            print("--- Alerts ---")
-            for a in alerts_list:
-                print(f"* {a}")
         print("=" * 40)
         print()
+
+# --- Global alerts shown once per cycle ---
+if alerts_list:
+    print("=== Alerts ===")
+    for a in alerts_list:
+        print(f"* {a}")
+    print("=" * 40)
