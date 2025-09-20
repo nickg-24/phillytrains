@@ -8,7 +8,7 @@ import datetime
 origin = "Conshohocken"
 destination = "Suburban Station"
 n = 2
-DEBUG = 1  # 0 = clean, 1 = medium, 2 = verbose
+DEBUG = 2  # 0 = clean, 1 = medium, 2 = verbose
 
 # GTFS-RT VehiclePosition status map
 STATUS_MAP = {
@@ -101,6 +101,24 @@ with rail_zip.open("calendar_dates.txt") as f:
             calendar_dates[service_id] = {}
         calendar_dates[service_id][date] = exception  # 1=added, 2=removed
 
+# --- Step 5: Service Alerts feed ---
+alerts_url = "https://www3.septa.org/gtfsrt/septarail-pa-us/Service/rtServiceAlerts.pb"
+resp = requests.get(alerts_url)
+alerts_feed = gtfs_realtime_pb2.FeedMessage()
+alerts_feed.ParseFromString(resp.content)
+
+alerts_list = []
+for entity in alerts_feed.entity:
+    if entity.HasField("alert"):
+        alert = entity.alert
+        # Pull description text if available
+        if alert.description_text and alert.description_text.translation:
+            desc = alert.description_text.translation[0].text
+            alerts_list.append(desc)
+
+if DEBUG >= 1:
+    print(f"[DEBUG] Loaded {len(alerts_list)} alerts")
+
 # --- Helper: check if service runs on date ---
 def service_active(service_id, date):
     date_str = date.strftime("%Y%m%d")
@@ -115,24 +133,17 @@ def service_active(service_id, date):
     start = datetime.datetime.strptime(row["start_date"], "%Y%m%d").date()
     end = datetime.datetime.strptime(row["end_date"], "%Y%m%d").date()
     if not (start <= date <= end):
-        if DEBUG >= 2:
-            print(f"Service {service_id} not valid (date out of range)")
         return False
     weekday = date.weekday()
     weekdays = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
-    active = row[weekdays[weekday]] == "1"
-    if DEBUG >= 2:
-        print(f"Service {service_id} active={active} on {date} ({weekdays[weekday]})")
-    return active
+    return row[weekdays[weekday]] == "1"
 
 # --- Helper: find first trip after midnight for origin→destination ---
 def find_first_trip_after(date, origin_name, dest_name):
     origin_ids = [sid for sid,name in stop_lookup.items() if name == origin_name]
     dest_ids = [sid for sid,name in stop_lookup.items() if name == dest_name]
-
     best_time = None
     best_trip = None
-
     for trip_id, stops in trip_stops.items():
         sid = trip_service.get(trip_id)
         if not sid or not service_active(sid, date):
@@ -150,8 +161,6 @@ def find_first_trip_after(date, origin_name, dest_name):
                 dep_fmt = format_gtfs_time(o[1], date)
                 arr_fmt = format_gtfs_time(d[1], date)
                 best_trip = (trip_id, dep_fmt, arr_fmt)
-    if DEBUG >= 2 and best_trip:
-        print(f"Best trip for {date}: {best_trip}")
     return best_trip
 
 # --- MAIN ---
@@ -159,8 +168,6 @@ if not nta_data:
     today = datetime.date.today()
     d = today + datetime.timedelta(days=1)
     while True:
-        if DEBUG >= 1:
-            print(f"Looking for service on {d}")
         trip = find_first_trip_after(d, origin, destination)
         if trip:
             tid, dep, arr = trip
@@ -220,5 +227,9 @@ else:
         print(f"Status:  {status}")
         if last_station:
             print(f"Last location: {last_station}")
+        if alerts_list:
+            print("--- Alerts ---")
+            for a in alerts_list:
+                print(f"* {a}")
         print("=" * 40)
         print()
