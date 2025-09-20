@@ -8,14 +8,7 @@ import datetime
 origin = "Conshohocken"
 destination = "Suburban Station"
 n = 2
-DEBUG = 1  # 0 = clean, 1 = medium, 2 = verbose
-
-# GTFS-RT VehiclePosition status map
-STATUS_MAP = {
-    0: "IN_TRANSIT_TO",
-    1: "STOPPED_AT",
-    2: "INCOMING_AT"
-}
+DEBUG = 0  # 0 = clean, 1 = medium, 2 = verbose
 
 # --- Helper: format GTFS HH:MM:SS into AM/PM ---
 def format_gtfs_time(timestr, service_date):
@@ -27,38 +20,21 @@ def format_gtfs_time(timestr, service_date):
         dt += datetime.timedelta(days=day_offset)
     return dt.strftime("%I:%M %p")
 
-# --- Step 1: NTA call ---
-nta_url = f"https://www3.septa.org/api/NextToArrive/index.php?req1={origin}&req2={destination}&req3={n}"
-nta_resp = requests.get(nta_url)
-nta_data = nta_resp.json()
-
-# --- Step 2: Trip Updates feed ---
-tu_url = "https://www3.septa.org/gtfsrt/septarail-pa-us/Trip/rtTripUpdates.pb"
-resp = requests.get(tu_url)
-tu_feed = gtfs_realtime_pb2.FeedMessage()
-tu_feed.ParseFromString(resp.content)
-
-# --- Step 3: Vehicle Positions feed ---
-vp_url = "https://www3.septa.org/gtfsrt/septarail-pa-us/Vehicle/rtVehiclePosition.pb"
-resp = requests.get(vp_url)
-vp_feed = gtfs_realtime_pb2.FeedMessage()
-vp_feed.ParseFromString(resp.content)
-
-# --- Step 4: Load GTFS static (rail) ---
+# --- Load GTFS static (rail only) ---
 zip_url = "https://www3.septa.org/developer/gtfs_public.zip"
 resp = requests.get(zip_url)
 outer = zipfile.ZipFile(io.BytesIO(resp.content))
 rail_bytes = outer.read("google_rail.zip")
 rail_zip = zipfile.ZipFile(io.BytesIO(rail_bytes))
 
-# stops.txt lookup
+# stops.txt
 stop_lookup = {}
 with rail_zip.open("stops.txt") as f:
     reader = csv.DictReader(io.TextIOWrapper(f, "utf-8"))
     for row in reader:
         stop_lookup[row["stop_id"]] = row["stop_name"]
 
-# stop_times.txt lookup
+# stop_times.txt
 trip_stops = {}
 with rail_zip.open("stop_times.txt") as f:
     reader = csv.DictReader(io.TextIOWrapper(f, "utf-8"))
@@ -67,95 +43,36 @@ with rail_zip.open("stop_times.txt") as f:
         seq = int(row["stop_sequence"])
         sid = row["stop_id"]
         dep = row["departure_time"]
-        if tid not in trip_stops:
-            trip_stops[tid] = []
-        trip_stops[tid].append((seq, sid, dep))
+        trip_stops.setdefault(tid, []).append((seq, sid, dep))
 for tid in trip_stops:
     trip_stops[tid].sort(key=lambda x: x[0])
 
-# trips.txt → service_id + route_id
+# trips.txt > service_id
 trip_service = {}
-trip_route = {}
 with rail_zip.open("trips.txt") as f:
     reader = csv.DictReader(io.TextIOWrapper(f, "utf-8"))
     for row in reader:
         trip_service[row["trip_id"]] = row["service_id"]
-        trip_route[row["trip_id"]] = row["route_id"]
 
 # calendar.txt
 calendar = {}
 with rail_zip.open("calendar.txt") as f:
     reader = csv.DictReader(io.TextIOWrapper(f, "utf-8"))
     for row in reader:
-        service_id = row["service_id"]
-        calendar[service_id] = row
+        calendar[row["service_id"]] = row
 
 # calendar_dates.txt
 calendar_dates = {}
 with rail_zip.open("calendar_dates.txt") as f:
     reader = csv.DictReader(io.TextIOWrapper(f, "utf-8"))
     for row in reader:
-        service_id = row["service_id"]
-        date = row["date"]
-        exception = row["exception_type"]
-        if service_id not in calendar_dates:
-            calendar_dates[service_id] = {}
-        calendar_dates[service_id][date] = exception
+        calendar_dates.setdefault(row["service_id"], {})[row["date"]] = row["exception_type"]
 
-# --- Step 5: Service Alerts feed ---
-alerts_url = "https://www3.septa.org/gtfsrt/septarail-pa-us/Service/rtServiceAlerts.pb"
-resp = requests.get(alerts_url)
-alerts_feed = gtfs_realtime_pb2.FeedMessage()
-alerts_feed.ParseFromString(resp.content)
-
-# --- Determine stop_ids for origin/destination ---
-origin_stop_ids = [sid for sid, name in stop_lookup.items() if name == origin]
-dest_stop_ids = [sid for sid, name in stop_lookup.items() if name == destination]
-
-# --- Dynamically infer route_id ---
-nta_route_id = None
-for trip_id, stops in trip_stops.items():
-    o = d = None
-    for seq, sid, dep in stops:
-        if sid in origin_stop_ids and o is None:
-            o = (seq, sid)
-        if sid in dest_stop_ids and o and seq > o[0] and d is None:
-            d = (seq, sid)
-    if o and d:
-        nta_route_id = trip_route.get(trip_id)
-        if nta_route_id:
-            break
-
-if DEBUG >= 1:
-    print(f"[DEBUG] Origin stops: {origin_stop_ids}, Dest stops: {dest_stop_ids}")
-    print(f"[DEBUG] Inferred route_id: {nta_route_id}")
-
-# --- Filter alerts relevant to this route/stops ---
-alerts_list = []
-for entity in alerts_feed.entity:
-    if entity.HasField("alert"):
-        alert = entity.alert
-        applies = False
-        for ie in alert.informed_entity:
-            if nta_route_id and ie.route_id == nta_route_id:
-                applies = True
-            if ie.stop_id in origin_stop_ids or ie.stop_id in dest_stop_ids:
-                applies = True
-        if not alert.informed_entity:  # global
-            applies = True
-        if applies and alert.description_text.translation:
-            desc = alert.description_text.translation[0].text
-            alerts_list.append(desc)
-
-if DEBUG >= 1:
-    print(f"[DEBUG] Loaded {len(alerts_list)} filtered alerts")
-
-# --- Helper: check if service runs on date ---
+# --- Service active check ---
 def service_active(service_id, date):
     date_str = date.strftime("%Y%m%d")
     if service_id in calendar_dates and date_str in calendar_dates[service_id]:
-        exc = calendar_dates[service_id][date_str]
-        return exc == "1"
+        return calendar_dates[service_id][date_str] == "1"
     if service_id not in calendar:
         return False
     row = calendar[service_id]
@@ -167,12 +84,12 @@ def service_active(service_id, date):
     weekdays = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
     return row[weekdays[weekday]] == "1"
 
-# --- Helper: find first trip after midnight ---
+# --- Find first trip after midnight for origin>destination ---
 def find_first_trip_after(date, origin_name, dest_name):
     origin_ids = [sid for sid, name in stop_lookup.items() if name == origin_name]
     dest_ids = [sid for sid, name in stop_lookup.items() if name == dest_name]
-    best_time = None
     best_trip = None
+    best_time = None
     for trip_id, stops in trip_stops.items():
         sid = trip_service.get(trip_id)
         if not sid or not service_active(sid, date):
@@ -192,14 +109,40 @@ def find_first_trip_after(date, origin_name, dest_name):
                 best_trip = (trip_id, dep_fmt, arr_fmt)
     return best_trip
 
+# --- Step 1: NTA call ---
+nta_url = f"https://www3.septa.org/api/NextToArrive/index.php?req1={origin}&req2={destination}&req3={n}"
+nta_resp = requests.get(nta_url)
+nta_data = nta_resp.json()
+if DEBUG >= 1:
+    print(f"[DEBUG] Pulled {len(nta_data)} trips from NTA API")
+
+# --- Step 2: Service Alerts ---
+alerts_url = "https://www3.septa.org/gtfsrt/septarail-pa-us/Service/rtServiceAlerts.pb"
+resp = requests.get(alerts_url)
+alerts_feed = gtfs_realtime_pb2.FeedMessage()
+alerts_feed.ParseFromString(resp.content)
+if DEBUG >= 1:
+    print(f"[DEBUG] Loaded {len(alerts_feed.entity)} service alerts")
+
+# Infer route_id for filtering (basic)
+route_id = None
+if nta_data:
+    if "Norristown" in nta_data[0].get("orig_line", ""):
+        route_id = "NOR"
+if DEBUG >= 1:
+    print(f"[DEBUG] Inferred route_id: {route_id}")
+
 # --- MAIN ---
 if not nta_data:
+    # no more trains today > look forward
     today = datetime.date.today()
     d = today + datetime.timedelta(days=1)
     while True:
         trip = find_first_trip_after(d, origin, destination)
         if trip:
-            tid, dep, arr = trip
+            _, dep, arr = trip
+            if DEBUG >= 1:
+                print(f"[DEBUG] Found next service on {d}: dep {dep}, arr {arr}")
             print("=" * 40)
             print(f"{origin} > {destination}")
             print(f"No more trains today.")
@@ -208,56 +151,38 @@ if not nta_data:
             break
         d += datetime.timedelta(days=1)
 else:
-    for idx, trip in enumerate(nta_data):
-        nta_train_id = trip.get("orig_train")
-        dep_time = trip.get("orig_departure_time")
-        arr_time = trip.get("orig_arrival_time")
-        status = trip.get("orig_delay")
-        last_station = None
-
-        # check cancellation
-        for entity in tu_feed.entity:
-            if entity.HasField("trip_update"):
-                trip_id = entity.trip_update.trip.trip_id
-                if nta_train_id and nta_train_id in trip_id:
-                    if entity.trip_update.trip.schedule_relationship == gtfs_realtime_pb2.TripDescriptor.CANCELED:
-                        status = "CANCELLED"
-                    break
-
-        # only compute last station for first train
-        if idx == 0:
-            for entity in vp_feed.entity:
-                if entity.HasField("vehicle"):
-                    trip_id = entity.vehicle.trip.trip_id
-                    if nta_train_id and nta_train_id in trip_id:
-                        vp = entity.vehicle
-                        cs = vp.current_stop_sequence
-                        st = vp.current_status
-                        sid = vp.stop_id
-                        if st == 1:  # STOPPED_AT
-                            last_station = stop_lookup.get(sid, sid)
-                        elif st == 0:  # IN_TRANSIT_TO
-                            if trip_id in trip_stops:
-                                prev_seq = cs - 1
-                                prev_stop = next((s for (seq, s, dep) in trip_stops[trip_id] if seq == prev_seq), None)
-                                if prev_stop:
-                                    last_station = stop_lookup.get(prev_stop, prev_stop)
-                            if not last_station:
-                                last_station = stop_lookup.get(sid, sid)
-                        break
-
+    for trip in nta_data:
+        if DEBUG >= 1:
+            print(f"[DEBUG] Processing NTA trip {trip.get('orig_train')} ({trip.get('orig_departure_time')} > {trip.get('orig_arrival_time')})")
         print("=" * 40)
         print(f"{origin} > {destination}")
-        print(f"Train #: {nta_train_id}")
-        print(f"Departs: {dep_time}")
-        print(f"Arrives: {arr_time}")
-        print(f"Status:  {status}")
-        if last_station:
-            print(f"Last location: {last_station}")
+        print(f"Train #: {trip.get('orig_train')}")
+        print(f"Departs: {trip.get('orig_departure_time')}")
+        print(f"Arrives: {trip.get('orig_arrival_time')}")
+        print(f"Status:  {trip.get('orig_delay')}")
         print("=" * 40)
         print()
 
-# --- Global alerts shown once per cycle ---
+# --- Filtered Alerts ---
+alerts_list = []
+for entity in alerts_feed.entity:
+    if entity.HasField("alert") and entity.alert.description_text.translation:
+        desc = entity.alert.description_text.translation[0].text
+        relevant = False
+        for ie in entity.alert.informed_entity:
+            if route_id and ie.route_id == route_id:
+                relevant = True
+            if ie.stop_id in stop_lookup and stop_lookup[ie.stop_id] in (origin, destination):
+                relevant = True
+        if not entity.alert.informed_entity:  # global
+            relevant = True
+        if relevant:
+            if DEBUG >= 1:
+                print(f"[DEBUG] Including alert: {desc[:50]}...")
+            alerts_list.append(desc)
+        elif DEBUG >= 1:
+            print(f"[DEBUG] Skipped irrelevant alert: {desc[:50]}...")
+
 if alerts_list:
     print("=== Alerts ===")
     for a in alerts_list:
