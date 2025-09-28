@@ -5,7 +5,6 @@ import zipfile, io, csv
 import datetime
 import yaml
 import os
-import time
 
 # --- Load Config ---
 def load_config(path="config.yaml"):
@@ -20,7 +19,6 @@ origin = config.get("origin", "Conshohocken")
 destination = config.get("destination", "Suburban Station")
 n = config.get("n", 2)
 DEBUG = config.get("debug", 0)
-refresh_interval = config.get("refresh_interval", 60)  # default 60 sec
 
 # --- Helper: format GTFS HH:MM:SS into AM/PM ---
 def format_gtfs_time(timestr, service_date):
@@ -32,7 +30,7 @@ def format_gtfs_time(timestr, service_date):
         dt += datetime.timedelta(days=day_offset)
     return dt.strftime("%I:%M %p")
 
-# --- Load GTFS static (rail only, once at startup) ---
+# --- Load GTFS static (rail only, once) ---
 zip_url = "https://www3.septa.org/developer/gtfs_public.zip"
 resp = requests.get(zip_url)
 outer = zipfile.ZipFile(io.BytesIO(resp.content))
@@ -146,7 +144,9 @@ def run_once():
     if DEBUG >= 1:
         print(f"[DEBUG] Inferred route_id: {route_id}")
 
-    # Print results
+    trains = []
+    alerts_list = []
+
     if not nta_data:
         today = datetime.date.today()
         d = today + datetime.timedelta(days=1)
@@ -154,30 +154,23 @@ def run_once():
             trip = find_first_trip_after(d, origin, destination)
             if trip:
                 _, dep, arr = trip
-                if DEBUG >= 1:
-                    print(f"[DEBUG] Found next service on {d}: dep {dep}, arr {arr}")
-                print("=" * 40)
-                print(f"{origin} > {destination}")
-                print(f"No more trains today.")
-                print(f"Next service: Departing {dep}, Arriving {arr}, on {d.strftime('%A, %B %d')}")
-                print("=" * 40)
+                trains.append({
+                    "train_no": None,
+                    "depart": dep,
+                    "arrive": arr,
+                    "status": f"Next service on {d.strftime('%A, %B %d')}"
+                })
                 break
             d += datetime.timedelta(days=1)
     else:
         for trip in nta_data:
-            if DEBUG >= 1:
-                print(f"[DEBUG] Processing NTA trip {trip.get('orig_train')} ({trip.get('orig_departure_time')} > {trip.get('orig_arrival_time')})")
-            print("=" * 40)
-            print(f"{origin} > {destination}")
-            print(f"Train #: {trip.get('orig_train')}")
-            print(f"Departs: {trip.get('orig_departure_time')}")
-            print(f"Arrives: {trip.get('orig_arrival_time')}")
-            print(f"Status:  {trip.get('orig_delay')}")
-            print("=" * 40)
-            print()
+            trains.append({
+                "train_no": trip.get("orig_train"),
+                "depart": trip.get("orig_departure_time"),
+                "arrive": trip.get("orig_arrival_time"),
+                "status": trip.get("orig_delay"),
+            })
 
-    # Filtered Alerts
-    alerts_list = []
     for entity in alerts_feed.entity:
         if entity.HasField("alert") and entity.alert.description_text.translation:
             desc = entity.alert.description_text.translation[0].text
@@ -193,23 +186,18 @@ def run_once():
                 if DEBUG >= 1:
                     print(f"[DEBUG] Including alert: {desc[:50]}...")
                 alerts_list.append(desc)
-            elif DEBUG >= 1:
-                print(f"[DEBUG] Skipped irrelevant alert: {desc[:50]}...")
 
-    if alerts_list:
-        print("=== Alerts ===")
-        for a in alerts_list:
-            print(f"* {a}")
-        print("=" * 40)
+    return {
+        "origin": origin,
+        "destination": destination,
+        "trains": trains,
+        "alerts": alerts_list,
+        "last_updated": datetime.datetime.now().isoformat()
+    }
 
-# --- Polling Loop ---
+# Allow testing standalone
 if __name__ == "__main__":
-    try:
-        while True:
-            run_once()
-            if DEBUG >= 1:
-                print(f"[DEBUG] Sleeping {refresh_interval} seconds...\n")
-            time.sleep(refresh_interval)
-    except KeyboardInterrupt:
-        print("\nExiting on user request.")
+    import json
+    data = run_once()
+    print(json.dumps(data, indent=2))
 
