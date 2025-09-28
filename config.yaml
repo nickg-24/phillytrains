@@ -1,0 +1,4 @@
+origin: "Conshohocken"
+destination: "Suburban Station"
+n: 2             # number of trains to fetch
+debug: 0        # 0 = clean, 1 = medium, 2 = verbose
