@@ -1,7 +1,7 @@
 # PhillyTrains – SEPTA LED Matrix Display
 
 This project uses a Raspberry Pi and RGB LED matrix to show live SEPTA Regional Rail information for a selected origin and destination.
-It automatically pulls data from SEPTA’s public APIs and displays upcoming trains, delays, and service alerts in a rotating format.
+It pulls data from SEPTA’s public APIs and displays upcoming trains, delays, and service alerts in a rotating format.
 
 See **[SETUP.md](./setup.md)** for instructions on installing dependencies and configuring the board.
 
@@ -71,4 +71,5 @@ This project uses open data from SEPTA:
 Built using:
 
 * [hzeller/rpi-rgb-led-matrix](https://github.com/hzeller/rpi-rgb-led-matrix) for LED control
+
 * [SEPTA Developer Program](https://www3.septa.org/developer/) for transit data
