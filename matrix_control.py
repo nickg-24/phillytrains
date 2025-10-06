@@ -38,10 +38,19 @@ def draw_logo(canvas):
     graphics.DrawText(canvas, font_large, 10, 30, blue, "SEPTA")
 
 def draw_train_info(canvas, train):
+    status_text = train.get('status', '').strip().lower()
+
+    # Color logic
+    if status_text == "on time":
+        status_color = graphics.Color(0, 255, 0)   # green
+    else:
+        status_color = graphics.Color(255, 0, 0)   # red
+
     graphics.DrawText(canvas, font_small, 2, 28, white, f"Train {train.get('train_no','')}")
     graphics.DrawText(canvas, font_small, 2, 40, white, f"Dep: {train.get('depart','')}")
     graphics.DrawText(canvas, font_small, 2, 52, white, f"Arr: {train.get('arrive','')}")
-    graphics.DrawText(canvas, font_small, 2, 62, white, f"{train.get('status','')}")
+    graphics.DrawText(canvas, font_small, 2, 62, status_color, train.get('status', ''))
+
 
 def draw_alert(canvas, alert_text):
     canvas.Clear()
