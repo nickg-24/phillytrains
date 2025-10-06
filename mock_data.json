@@ -1,0 +1,23 @@
+{
+  "origin": "Conshohocken",
+  "destination": "Suburban Station",
+  "trains": [
+    {
+      "train_no": "2465",
+      "depart": "7:45PM",
+      "arrive": "8:25PM",
+      "status": "1 min"
+    },
+    {
+      "train_no": "2469",
+      "depart": "8:45PM",
+      "arrive": "9:25PM",
+      "status": "On time"
+    }
+  ],
+  "alerts": [
+    "The down escalator at Jefferson Station at 12th Street from the entrance of the Convention Center down to the Mezzanine leading to the Regional Rail concourse is out of service. Riders are advised to use the elevator or adjoining stairs.",
+    "On Monday, October 6, from 9:15 am to 3 pm, passengers must board all trains on the outbound platforms from Allegheny to Ivy Ridge stations."
+  ],
+  "last_updated": "2025-10-06T00:44:13.240447"
+}

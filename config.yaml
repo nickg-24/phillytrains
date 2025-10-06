@@ -1,5 +1,17 @@
 origin: "Conshohocken"
 destination: "Suburban Station"
-n: 2             # number of trains to fetch
-debug: 0        # 0 = clean, 1 = medium, 2 = verbose
-refresh_interval: 10
+n: 2
+debug: 1
+refresh_interval: 60
+
+matrix:
+  rows: 64
+  cols: 64
+  chain_length: 1
+  parallel: 1
+  hardware_mapping: "adafruit-hat"
+
+display:
+  logo: 5
+  train: 10
+  alert: 10
