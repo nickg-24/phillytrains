@@ -1,8 +1,8 @@
 origin: "Conshohocken"
 destination: "Suburban Station"
 n: 2
-debug: 1
-refresh_interval: 60
+debug: 0
+refresh_interval: 180
 
 matrix:
   rows: 64

@@ -1,6 +1,8 @@
+#!/usr/bin/env python3
 from rgbmatrix import RGBMatrix, RGBMatrixOptions, graphics
 from PIL import Image
-import json, time, os, yaml
+import time, yaml, json
+from fetch_data import run_once
 
 # ---------- Load config ----------
 def load_config(path="config.yaml"):
@@ -70,10 +72,10 @@ def draw_train_info(canvas, train):
 def paginate_alert(canvas, alert_text):
     """Show long alerts one 'page' at a time with 4 lines per page."""
     words = alert_text.split()
-    max_chars = 13  # roughly fits width for 5x8 font
+    max_chars = 13
     lines, line = [], ""
 
-    # Wrap text into lines
+    # Wrap text
     for w in words:
         if len(line + " " + w) < max_chars:
             line += (" " if line else "") + w
@@ -83,8 +85,8 @@ def paginate_alert(canvas, alert_text):
     if line:
         lines.append(line)
 
-    chunk_size = 4  # lines per page now
-    hold_time = 2   # seconds per page
+    chunk_size = 4
+    hold_time = 2
 
     for i in range(0, len(lines), chunk_size):
         canvas.Clear()
@@ -96,9 +98,7 @@ def paginate_alert(canvas, alert_text):
         matrix.SwapOnVSync(canvas)
         time.sleep(hold_time)
 
-
-# ---------- Short alerts ----------
-def draw_wrapped_alert(canvas, alert_text):
+def draw_wrapped_alert(canvas, alert_text, T_ALERT):
     """Show short alerts as one static message."""
     canvas.Clear()
     header_color = graphics.Color(255, 255, 0)
@@ -123,20 +123,12 @@ def draw_wrapped_alert(canvas, alert_text):
     matrix.SwapOnVSync(canvas)
     time.sleep(T_ALERT)
 
-def display_alert(canvas, alert_text):
+def display_alert(canvas, alert_text, T_ALERT):
     """Choose between short (static) and long (paginated) alerts."""
     if len(alert_text) > 60:
         paginate_alert(canvas, alert_text)
     else:
-        draw_wrapped_alert(canvas, alert_text)
-
-# ---------- Load data ----------
-DATA_PATH = "./mock_data.json"
-with open(DATA_PATH) as f:
-    data = json.load(f)
-trains  = data.get("trains", [])
-alerts  = data.get("alerts", [])
-route   = f"{data['origin']} → {data['destination']}"
+        draw_wrapped_alert(canvas, alert_text, T_ALERT)
 
 # ---------- Timing ----------
 tconf = config.get("display", {})
@@ -144,7 +136,30 @@ T_LOGO  = tconf.get("logo", 5)
 T_TRAIN = tconf.get("train", 10)
 T_ALERT = tconf.get("alert", 10)
 
-# ---------- Header scroll setup ----------
+refresh_interval = config.get("refresh_interval", 300)
+
+# ---------- Main display loop ----------
+def refresh_data():
+    """Fetch latest data from fetch_data.py."""
+    try:
+        data = run_once()
+        return data
+    except Exception as e:
+        print(f"[ERROR] Could not fetch live data: {e}")
+        return None
+
+# Initial load
+data = refresh_data()
+last_refresh = time.time()
+
+if not data:
+    raise RuntimeError("Failed to load initial data.")
+
+trains  = data.get("trains", [])
+alerts  = data.get("alerts", [])
+route   = f"{data['origin']} → {data['destination']}"
+
+# Header setup
 header_w = graphics.DrawText(canvas, font_small, 0, 10, blue, route)
 header = {"text": route, "font": font_small, "color": blue, "width": header_w,
           "pos": canvas.width if header_w > canvas.width else 0, "y": 10}
@@ -152,7 +167,23 @@ header = {"text": route, "font": font_small, "color": blue, "width": header_w,
 # ---------- Main slideshow ----------
 try:
     while True:
-        # 1. SEPTA logo
+        # Check if refresh interval has passed
+        if time.time() - last_refresh > refresh_interval:
+            new_data = refresh_data()
+            if new_data:
+                data = new_data
+                trains  = data.get("trains", [])
+                alerts  = data.get("alerts", [])
+                route   = f"{data['origin']} → {data['destination']}"
+                header_w = graphics.DrawText(canvas, font_small, 0, 10, blue, route)
+                header = {"text": route, "font": font_small, "color": blue,
+                          "width": header_w,
+                          "pos": canvas.width if header_w > canvas.width else 0,
+                          "y": 10}
+                print(f"[INFO] Data refreshed at {time.strftime('%H:%M:%S')}")
+            last_refresh = time.time()
+
+        # 1. Logo
         draw_logo(canvas)
         time.sleep(T_LOGO)
 
@@ -172,9 +203,7 @@ try:
 
         # 3. Alerts
         for alert in alerts:
-            display_alert(canvas, alert)
-
-        # 4. Loop back to logo
+            display_alert(canvas, alert, T_ALERT)
 
 except KeyboardInterrupt:
     print("Exiting...")
