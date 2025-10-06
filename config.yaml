@@ -1,8 +1,8 @@
 origin: "Conshohocken"
 destination: "Suburban Station"
 n: 2
-debug: 0
-refresh_interval: 180
+debug: 1
+refresh_interval: 60 # refresh data every 60 seconds
 
 matrix:
   rows: 64
@@ -10,7 +10,7 @@ matrix:
   chain_length: 1
   parallel: 1
   hardware_mapping: "adafruit-hat"
-  brightness: 60
+  brightness: 50
 
 display:
   logo: 5

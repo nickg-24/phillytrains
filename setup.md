@@ -111,20 +111,59 @@ sudo python3 matrix_control.py
 
 ---
 
-## 6. Optional: Auto-start on boot
+## 6. Auto-start on boot (recommended)
 
-If you want the board to start automatically:
+To have the board start automatically when the Pi boots, use **systemd**.
 
-1. Edit your crontab:
-
-   ```bash
-   sudo crontab -e
-   ```
-2. Add this line:
+1. Create a new service file:
 
    ```bash
-   @reboot sleep 20 && cd /path/to/phillytrains && : > logs/matrix.log && python3 matrix_control.py > logs/matrix.log 2>&1 &
+   sudo vim /etc/systemd/system/phillytrains.service
    ```
+
+2. Paste the following:
+
+   ```ini
+   [Unit]
+   Description=SEPTA LED Matrix Display
+   After=network-online.target
+   Wants=network-online.target
+
+   [Service]
+   Type=simple
+   User=root
+   WorkingDirectory=/path/to/phillytrains
+   ExecStart=/usr/bin/python3 -u /path/to/phillytrains/matrix_control.py
+   Restart=always
+   RestartSec=10
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+   > **Note:**
+   > The script must run as `root` because the LED matrix library requires GPIO access.
+
+3. Reload systemd and enable the service:
+
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable phillytrains
+   sudo systemctl start phillytrains
+   ```
+
+4. To check the status or logs:
+
+   ```bash
+   sudo systemctl status phillytrains
+   sudo journalctl -u phillytrains -f
+   ```
+
+   * `status` shows whether it’s running.
+   * `journalctl -f` streams live output (like `tail -f`).
+
+5. The service will now start automatically on every boot.
+
 
 ---
 
