@@ -10,6 +10,7 @@ matrix:
   chain_length: 1
   parallel: 1
   hardware_mapping: "adafruit-hat"
+  brightness: 60
 
 display:
   logo: 5
