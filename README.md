@@ -9,24 +9,16 @@ See **[SETUP.md](./setup.md)** for instructions on installing dependencies and c
 
 ## Preview
 ![Slide 1](images/slide1.jpg)
-*(Photo of the finished display will go here)*
-
 > *Slide 1: SEPTA Logo*
 
 [Slide 2](images/slide2.jpg)
-*(Photo of the finished display will go here)*
-
 > *Slide 2: Train View*
 
 [Slide 3](images/slide3.jpg)
-*(Photo of the finished display will go here)*
-
 > *Slide 3: Train View*
 
 
 [Slide 4](images/slide4.jpg)
-*(Photo of the finished display will go here)*
-
 > *Slide 4: Alert View*
 ---
 
@@ -88,5 +80,6 @@ Built using:
 * [hzeller/rpi-rgb-led-matrix](https://github.com/hzeller/rpi-rgb-led-matrix) for LED control
 
 * [SEPTA Developer Program](https://www3.septa.org/developer/) for transit data
+
 
 
