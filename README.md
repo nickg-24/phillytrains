@@ -68,7 +68,7 @@ This project uses open data from SEPTA:
 * **`fetch_data.py`** collects current train and alert data from SEPTA’s APIs.
 * **`matrix_control.py`** renders that data on the LED matrix in a continuous slideshow loop.
 * **`config.yaml`** defines station names, display brightness, and refresh timing.
-* The system starts automatically on boot using a cron job.
+* The system starts automatically on boot.
 
 ---
 
@@ -79,6 +79,7 @@ Built using:
 * [hzeller/rpi-rgb-led-matrix](https://github.com/hzeller/rpi-rgb-led-matrix) for LED control
 
 * [SEPTA Developer Program](https://www3.septa.org/developer/) for transit data
+
 
 
 
