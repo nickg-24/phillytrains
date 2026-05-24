@@ -1,8 +1,19 @@
-origin: "Conshohocken"
-destination: "Suburban Station"
-n: 2
+rail_lines:
+  - name: "Norristown"
+    origin: "Conshohocken"
+    destination: "Suburban Station"
+    route_id: "NOR"
+    n: 2
+
+subway:
+  station: "Lombard-South"
+  route_id: "B1"
+  stops:
+    northbound: "32139"
+    southbound: "1283"
+
 debug: 1
-refresh_interval: 60 # refresh data every 60 seconds
+refresh_interval: 60
 
 matrix:
   rows: 64
