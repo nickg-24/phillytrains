@@ -16,6 +16,7 @@ class MatrixDisplay:
             opts.parallel = config.get("parallel", 1)
             opts.hardware_mapping = config.get("hardware_mapping", "adafruit-hat")
             opts.brightness = config.get("brightness", 50)
+            opts.drop_privileges = False
             self._matrix = RGBMatrix(options=opts)
             self._canvas = self._matrix.CreateFrameCanvas()
         else:
