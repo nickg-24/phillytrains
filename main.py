@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
+import os
 import time
 import yaml
+
+# Use the OS cert store instead of certifi — avoids issues when running under sudo in a venv.
+os.environ.setdefault("REQUESTS_CA_BUNDLE", "/etc/ssl/certs/ca-certificates.crt")
 from data.rail import fetch_rail
 from data.subway import fetch_subway
 from data.alerts import fetch_alerts
