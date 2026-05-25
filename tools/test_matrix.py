@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Hardware smoke test — displays a solid blue screen for 5 seconds.
-Run with: sudo .venv/bin/python3 test_matrix.py
+Run with: sudo .venv/bin/python3 tools/test_matrix.py
 
 If the matrix lights up blue, the library and wiring are good.
 """

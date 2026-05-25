@@ -40,7 +40,7 @@ Everything is configured in `config.yaml` — no code changes needed to track di
 
 ## Setup
 
-See **[setup.md](./setup.md)** for full instructions. The short version:
+See **[setup.md](./docs/setup.md)** for full instructions. The short version:
 
 1. Flash Raspberry Pi OS Lite (64-bit) with Wi-Fi and SSH configured
 2. Clone the repo and edit `config.yaml` for your stops

@@ -96,7 +96,7 @@ echo ""
 if [ "$REBOOT_NEEDED" = true ]; then
     warn "A reboot is required to disable the audio driver."
     warn "After rebooting, verify hardware:"
-    warn "  sudo $PYTHON $PROJECT_DIR/test_matrix.py"
+    warn "  sudo $PYTHON $PROJECT_DIR/tools/test_matrix.py"
     warn "Then start the service:"
     warn "  sudo systemctl start $SERVICE"
     echo ""
@@ -105,7 +105,7 @@ if [ "$REBOOT_NEEDED" = true ]; then
         sudo reboot
     fi
 else
-    echo "Verify hardware:  sudo $PYTHON $PROJECT_DIR/test_matrix.py"
+    echo "Verify hardware:  sudo $PYTHON $PROJECT_DIR/tools/test_matrix.py"
     echo "Start service:    sudo systemctl start $SERVICE"
     echo "Check logs:       sudo journalctl -u $SERVICE -f"
 fi

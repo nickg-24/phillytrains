@@ -107,7 +107,7 @@ Reboot if prompted.
 ## 5. Verify the hardware
 
 ```bash
-sudo .venv/bin/python3 test_matrix.py
+sudo .venv/bin/python3 tools/test_matrix.py
 ```
 
 The matrix should light up **solid blue**. Press Ctrl+C to stop.

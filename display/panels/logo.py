@@ -1,7 +1,7 @@
 from pathlib import Path
 from PIL import Image, UnidentifiedImageError
 
-_LOGO = Path(__file__).resolve().parents[2] / "septa_logo.png"
+_LOGO = Path(__file__).resolve().parents[2] / "images" / "septa_logo.png"
 
 
 def render(size=(64, 64)):
