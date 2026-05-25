@@ -1,180 +1,205 @@
-# Train Board Setup
+# PhillyTrains — Pi Setup Guide
 
-Steps to prepare a Raspberry Pi for running the train board project.
-The Pi is treated as a single-purpose system, so everything is installed system-wide.
+Complete setup instructions for a fresh Raspberry Pi.
 
 ---
 
-## 1. Install system packages
+## 1. Flash the OS
 
-Update apt and install the required build tools:
+Use **Raspberry Pi OS Lite (64-bit)** — the headless version without desktop.
+Flash it with [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
+
+In the Imager's advanced settings (gear icon) before flashing:
+- Set a **hostname** (e.g. `phillytrains`)
+- Enable **SSH**
+- Set a **username and password**
+- Configure **Wi-Fi** if not using ethernet
+
+After flashing, boot the Pi and SSH in:
 
 ```bash
-sudo apt update
-sudo apt upgrade
-sudo apt install -y git python3-dev python3-pip python3-pillow make g++
+ssh <your-username>@phillytrains.local
 ```
 
 ---
 
-## 2. Install Python packages
-
-Raspberry Pi OS blocks system-wide pip installs by default.
-Use the `--break-system-packages` flag:
+## 2. System update and build dependencies
 
 ```bash
-pip3 install --upgrade pip setuptools wheel --break-system-packages
-pip3 install -r requirements.txt --break-system-packages
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y git python3-dev python3-venv cython3
 ```
 
-`requirements.txt` includes:
-
-```
-requests
-protobuf
-gtfs-realtime-bindings
-pyyaml
-Pillow
-```
+`cython3` is required to compile the LED matrix Python bindings.
 
 ---
 
-## 3. Install the LED matrix library
+## 3. Disable the audio driver
 
-Clone the hzeller repo and build the Python bindings:
+The Pi's PWM audio shares hardware with the LED matrix. If audio is enabled, the display will flicker or show garbage. Disable it permanently:
 
 ```bash
-git clone https://github.com/hzeller/rpi-rgb-led-matrix
-cd rpi-rgb-led-matrix/bindings/python
-make build-python
-sudo make install-python
+# On Raspberry Pi OS Bookworm (current):
+sudo nano /boot/firmware/config.txt
+
+# On older Bullseye:
+sudo nano /boot/config.txt
 ```
 
-Verify installation:
+Find the line `dtparam=audio=on` and change it to:
+
+```
+dtparam=audio=off
+```
+
+Save and reboot:
 
 ```bash
-python3 -c "from rgbmatrix import RGBMatrix; print('OK')"
+sudo reboot
 ```
-
-If `OK` is printed, the bindings installed correctly.
 
 ---
 
-## 4. Project setup
-
-Clone or copy the train board project to your Pi, then edit `config.yaml` with your station and display settings:
-
-```yaml
-origin: "Conshohocken"
-destination: "Suburban Station"
-n: 2
-debug: 1
-refresh_interval: 120   # seconds between data refreshes
-
-matrix:
-  rows: 64
-  cols: 64
-  chain_length: 1
-  parallel: 1
-  hardware_mapping: "adafruit-hat"
-  brightness: 60
-
-display:
-  logo: 5
-  train: 10
-  alert: 10
-```
-
-**Notes:**
-
-* `origin` and `destination` are the station names as listed in SEPTA’s GTFS data.
-* `refresh_interval` controls how often new data is pulled from SEPTA’s APIs.
-* `matrix` and `display` blocks control hardware and timing behavior for the LED slideshow.
-
----
-
-## 5. Run the scripts
-
-Fetch data manually (for testing):
+## 4. Clone the repo
 
 ```bash
-python3 fetch_data.py
+git clone https://github.com/nickgei123/phillytrains.git ~/phillytrains
+cd ~/phillytrains
 ```
 
-Run the slideshow on the LED matrix:
+> Replace the URL with your actual GitHub repo URL.
+
+---
+
+## 5. Create a virtual environment and install dependencies
 
 ```bash
-sudo python3 matrix_control.py
+python3 -m venv .venv
+.venv/bin/pip install --upgrade pip
+.venv/bin/pip install -r requirements.txt
 ```
 
-(`sudo` is required for GPIO access on most Pi setups.)
+---
+
+## 6. Install the LED matrix library
+
+The rpi-rgb-led-matrix library is pip-installable. It compiles C++ code during install, so it takes a few minutes:
+
+```bash
+.venv/bin/pip install git+https://github.com/hzeller/rpi-rgb-led-matrix
+```
+
+Verify it installed:
+
+```bash
+.venv/bin/python3 -c "from rgbmatrix import RGBMatrix; print('OK')"
+```
+
+If you see `OK`, the library is ready.
 
 ---
 
-## 6. Auto-start on boot (recommended)
+## 7. Verify the matrix hardware
 
-To have the board start automatically when the Pi boots, use **systemd**.
+Run the hardware smoke test. This requires `sudo` because the matrix library needs GPIO access:
 
-1. Create a new service file:
+```bash
+sudo .venv/bin/python3 test_matrix.py
+```
 
-   ```bash
-   sudo vim /etc/systemd/system/phillytrains.service
-   ```
+The matrix should light up **solid blue** for a few seconds. Press Ctrl+C to stop.
 
-2. Paste the following:
-
-   ```ini
-   [Unit]
-   Description=SEPTA LED Matrix Display
-   After=network-online.target
-   Wants=network-online.target
-
-   [Service]
-   Type=simple
-   User=root
-   WorkingDirectory=/path/to/phillytrains
-   ExecStart=/usr/bin/python3 -u /path/to/phillytrains/matrix_control.py
-   Restart=always
-   RestartSec=10
-
-   [Install]
-   WantedBy=multi-user.target
-   ```
-
-   > **Note:**
-   > The script must run as `root` because the LED matrix library requires GPIO access.
-
-3. Reload systemd and enable the service:
-
-   ```bash
-   sudo systemctl daemon-reload
-   sudo systemctl enable phillytrains
-   sudo systemctl start phillytrains
-   ```
-
-4. To check the status or logs:
-
-   ```bash
-   sudo systemctl status phillytrains
-   sudo journalctl -u phillytrains -f
-   ```
-
-   * `status` shows whether it’s running.
-   * `journalctl -f` streams live output (like `tail -f`).
-
-5. The service will now start automatically on every boot.
-
+If the matrix does not light up:
+- Double-check the ribbon cable between the bonnet and the matrix
+- Confirm the 5V power supply is plugged into the matrix (not just the Pi)
+- Make sure `hardware_mapping: "adafruit-hat"` is correct in `config.yaml`
+  - Some Adafruit bonnets need `"adafruit-hat-pwm"` instead — try that if the default doesn't work
 
 ---
 
-## 7. Troubleshooting
+## 8. Run the display
 
-* **No LEDs lighting up:**
-  Check power wiring, brightness setting, and GPIO mapping.
-* **Slow startup:**
-  The first launch downloads and parses SEPTA’s full GTFS dataset (~10–15s).
-  After that, refreshes are fast.
-* **Wrong stations:**
-  Make sure `origin` and `destination` match SEPTA stop names exactly.
-* **Dim or harsh display:**
-  Adjust `matrix.brightness` in `config.yaml` (0–100).
+```bash
+sudo .venv/bin/python3 main.py
+```
+
+The board will fetch live SEPTA data and begin the slideshow. First run downloads GTFS data (~10–15 seconds before the first slide appears).
+
+To stop: **Ctrl+C**
+
+---
+
+## 9. Auto-start on boot (systemd)
+
+1. Create the service file:
+
+```bash
+sudo nano /etc/systemd/system/phillytrains.service
+```
+
+2. Paste the following (replace `<your-username>` with your actual username):
+
+```ini
+[Unit]
+Description=PhillyTrains LED Display
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/<your-username>/phillytrains
+ExecStart=/home/<your-username>/phillytrains/.venv/bin/python3 -u /home/<your-username>/phillytrains/main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+3. Enable and start it:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable phillytrains
+sudo systemctl start phillytrains
+```
+
+4. Check status and live logs:
+
+```bash
+sudo systemctl status phillytrains
+sudo journalctl -u phillytrains -f
+```
+
+---
+
+## 10. Pushing updates from your laptop
+
+On your laptop (WSL):
+
+```bash
+git add -A && git commit -m "your message"
+git push
+```
+
+On the Pi:
+
+```bash
+cd ~/phillytrains
+git pull
+sudo systemctl restart phillytrains
+```
+
+---
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| Display flickers or shows noise | Audio driver still enabled — revisit Step 3 |
+| `OK` prints but test_matrix.py crashes | Try `hardware_mapping: "adafruit-hat-pwm"` in `config.yaml` |
+| Display is dim | Increase `brightness` in `config.yaml` (0–100) |
+| Slow first start | Normal — GTFS data is downloading. Subsequent starts are fast. |
+| `No module named 'rgbmatrix'` | Run install command in Step 6 again; confirm you're using `.venv/bin/python3` |
+| `Permission denied` on GPIO | Must run with `sudo .venv/bin/python3`, not plain `python3` |
