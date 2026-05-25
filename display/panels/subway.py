@@ -37,14 +37,14 @@ def _upcoming(times):
                 result.append(t)
         except ValueError:
             result.append(t)
-    return result[:3]
+    return result[:4]
 
 
 def render(data, direction, size=(64, 64)):
     """data: output of data.subway.fetch_subway(); direction: 'northbound' or 'southbound'"""
-    img = Image.new("RGB", size, (0, 0, 0))
+    _, _, font_sm = _load_fonts()
+    img  = Image.new("RGB", size, (0, 0, 0))
     draw = ImageDraw.Draw(img)
-    font_lg, font_md, font_sm = _load_fonts()
     w, _ = size
 
     route_id = data.get("route_id", "")
@@ -52,19 +52,19 @@ def render(data, direction, size=(64, 64)):
     labels   = data.get("labels", _DEFAULT_LABELS)
     label    = labels.get(direction, direction.upper())
 
-    label_w = draw.textbbox((0, 0), label, font=font_md)[2]
-    _text(draw, (max(2, (w - label_w) // 2), 2), label, font_md, color)
-    draw.line([(0, 14), (w - 1, 14)], fill=_DIVIDER)
+    label_w = draw.textbbox((0, 0), label, font=font_sm)[2]
+    _text(draw, (max(2, (w - label_w) // 2), 2), label, font_sm, color)
+    draw.line([(0, 12), (w - 1, 12)], fill=_DIVIDER)
 
     times = _upcoming(data.get(direction, []))
     if not times:
-        _text(draw, (2, 20), "No upcoming", font_sm, _GRAY)
-        _text(draw, (2, 30), "departures.", font_sm, _GRAY)
+        _text(draw, (2, 18), "No upcoming",  font_sm, _GRAY)
+        _text(draw, (2, 30), "departures.",  font_sm, _GRAY)
         return img
 
-    y = 18
+    y = 16
     for t in times:
-        _text(draw, (2, y), t, font_lg, _WHITE)
-        y += 16
+        _text(draw, (2, y), t, font_sm, _WHITE)
+        y += 12
 
     return img

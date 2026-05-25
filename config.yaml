@@ -1,7 +1,12 @@
 rail_lines:
-  - name: "Norristown"
-    origin: "Conshohocken"
-    destination: "Suburban Station"
+  - name: "Suburban"
+    origin: "Suburban Station"
+    destination: "Conshohocken"
+    route_id: "NOR"
+    n: 2
+  - name: "Jefferson"
+    origin: "Jefferson Station"
+    destination: "Conshohocken"
     route_id: "NOR"
     n: 2
 
