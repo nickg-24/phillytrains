@@ -5,11 +5,24 @@ import yaml
 
 # Use the OS cert store instead of certifi — avoids issues when running under sudo in a venv.
 os.environ.setdefault("REQUESTS_CA_BUNDLE", "/etc/ssl/certs/ca-certificates.crt")
+
 from data.rail import fetch_rail
 from data.subway import fetch_subway
 from data.alerts import fetch_alerts
 from display.matrix import MatrixDisplay
 from display.panels import logo, rail, subway, alerts
+
+_FRAME_DELAY = 0.033  # ~30 fps
+
+
+def _show_slide(display, frames, duration):
+    """Show a slide for `duration` seconds, looping through frames if animated."""
+    end = time.time() + duration
+    i = 0
+    while time.time() < end:
+        display.show(frames[i % len(frames)])
+        time.sleep(_FRAME_DELAY)
+        i += 1
 
 
 def _fetch_all(config):
@@ -23,19 +36,28 @@ def _fetch_all(config):
 
 def _build_slides(config, data):
     t = config.get("display", {})
-    slides = [(logo.render(), t.get("logo", 5))]
+    t_logo  = t.get("logo", 5)
+    t_train = t.get("train", 10)
+    t_alert = t.get("alert", 10)
+
+    slides = [([logo.render()], t_logo)]
 
     for line_data in data["rail"]:
-        slides.append((rail.render(line_data), t.get("train", 10)))
+        trains = line_data.get("trains", [])
+        if not trains:
+            slides.append((rail.render(line_data["name"], None), t_train))
+        else:
+            for train in trains:
+                slides.append((rail.render(line_data["name"], train), t_train))
 
     sub = data["subway"]
     if sub.get("northbound"):
-        slides.append((subway.render(sub, "northbound"), t.get("train", 10)))
+        slides.append(([subway.render(sub, "northbound")], t_train))
     if sub.get("southbound"):
-        slides.append((subway.render(sub, "southbound"), t.get("train", 10)))
+        slides.append(([subway.render(sub, "southbound")], t_train))
 
     for img in alerts.render(data["alerts"]):
-        slides.append((img, t.get("alert", 10)))
+        slides.append(([img], t_alert))
 
     return slides
 
@@ -56,9 +78,8 @@ def main():
                 slides = _build_slides(config, data)
                 last_refresh = time.time()
 
-            for image, duration in slides:
-                display.show(image)
-                time.sleep(duration)
+            for frames, duration in slides:
+                _show_slide(display, frames, duration)
 
     except KeyboardInterrupt:
         print("Stopping.")

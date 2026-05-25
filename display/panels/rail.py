@@ -1,11 +1,14 @@
 from PIL import Image, ImageDraw
 from display.fonts import load as _load_fonts
 
-_WHITE = (255, 255, 255)
-_GREEN = (0, 200, 60)
-_RED = (220, 50, 50)
-_GRAY = (120, 120, 120)
+_WHITE  = (255, 255, 255)
+_GREEN  = (0, 200, 60)
+_RED    = (220, 50, 50)
+_GRAY   = (120, 120, 120)
 _DIVIDER = (60, 60, 80)
+
+# Scroll speed: 1 pixel per frame at ~30 fps
+_FRAME_DELAY = 0.033
 
 
 def _status_color(status):
@@ -18,45 +21,68 @@ def _status_color(status):
 
 
 def _fit(draw, text, font, max_px):
-    """Truncate text with ellipsis to fit within max_px."""
     if not text:
         return ""
     if draw.textbbox((0, 0), text, font=font)[2] <= max_px:
         return text
     while len(text) > 1:
         text = text[:-1]
-        candidate = text + "…"
-        if draw.textbbox((0, 0), candidate, font=font)[2] <= max_px:
-            return candidate
+        if draw.textbbox((0, 0), text + "…", font=font)[2] <= max_px:
+            return text + "…"
     return text
 
 
-def render(data, size=(64, 64)):
-    """data: output of data.rail.fetch_rail()"""
+def _make_base(train, font_lg, font_sm, size):
+    """Renders the static portion of the slide (everything below the header)."""
+    w, h = size
     img = Image.new("RGB", size, (0, 0, 0))
     draw = ImageDraw.Draw(img)
-    font_hd, font_bd = _load_fonts()
-    w, _ = size
+    draw.line([(0, 15), (w - 1, 15)], fill=_DIVIDER)
 
-    name = data.get("name", "").upper()
-    name_w = draw.textbbox((0, 0), name, font=font_hd)[2]
-    draw.text((max(2, (w - name_w) // 2), 1), name, font=font_hd, fill=_WHITE)
-    draw.line([(0, 12), (w - 1, 12)], fill=_DIVIDER)
-
-    trains = data.get("trains", [])
-    if not trains:
-        draw.text((2, 15), "No service", font=font_bd, fill=_GRAY)
-        draw.text((2, 25), "scheduled.", font=font_bd, fill=_GRAY)
+    if train is None:
+        draw.text((2, 20), "No service", font=font_sm, fill=_GRAY)
+        draw.text((2, 30), "scheduled.", font=font_sm, fill=_GRAY)
         return img
 
-    y = 14
-    for train in trains[:2]:
-        depart = train.get("depart") or "—"
-        status = train.get("status") or ""
-        draw.text((2, y), depart, font=font_bd, fill=_WHITE)
-        y += 10
-        draw.text((2, y), _fit(draw, status, font_bd, w - 4), font=font_bd,
-                  fill=_status_color(status))
-        y += 12
+    depart = train.get("depart") or "—"
+    status = train.get("status") or ""
+    arrive = train.get("arrive") or ""
+
+    draw.text((2, 19), depart, font=font_lg, fill=_WHITE)
+    draw.text((2, 34), _fit(draw, status, font_lg, w - 4), font=font_lg,
+              fill=_status_color(status))
+    if arrive:
+        draw.text((2, 51), "> " + arrive, font=font_sm, fill=_GRAY)
 
     return img
+
+
+def render(line_name, train, size=(64, 64)):
+    """Returns a list of PIL Images (animation frames) for one train.
+
+    line_name: string (e.g. 'Norristown')
+    train: dict with keys depart, arrive, status — or None for no-service slide
+    """
+    font_lg, font_md, font_sm = _load_fonts()
+    w, h = size
+
+    base = _make_base(train, font_lg, font_sm, size)
+    header = line_name.upper()
+
+    scratch = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    header_w = scratch.textbbox((0, 0), header, font=font_lg)[2]
+
+    if header_w <= w:
+        # Header fits — single static frame, centered
+        frame = base.copy()
+        x = max(2, (w - header_w) // 2)
+        ImageDraw.Draw(frame).text((x, 1), header, font=font_lg, fill=_WHITE)
+        return [frame]
+
+    # Header wider than display — scroll left across the slide
+    frames = []
+    for pos in range(w + header_w):
+        frame = base.copy()
+        ImageDraw.Draw(frame).text((w - pos, 1), header, font=font_lg, fill=_WHITE)
+        frames.append(frame)
+    return frames
