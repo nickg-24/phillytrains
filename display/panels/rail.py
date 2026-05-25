@@ -9,10 +9,8 @@ _GRAY  = (120, 120, 120)
 
 
 def _text(draw, xy, text, font, fill):
-    """Draw text twice with 1px horizontal offset for a bolder stroke."""
     x, y = xy
     draw.text((x, y), text, font=font, fill=fill)
-    draw.text((x + 1, y), text, font=font, fill=fill)
 
 
 def _status_color(status):
