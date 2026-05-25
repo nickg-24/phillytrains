@@ -47,8 +47,8 @@ def _make_base(train, font, size):
     draw = ImageDraw.Draw(img)
 
     if train is None:
-        _text(draw, (2, 20), "No service", font, _GRAY)
-        _text(draw, (2, 32), "scheduled.", font, _GRAY)
+        _text(draw, (2, 26), "No service", font, _GRAY)
+        _text(draw, (2, 38), "scheduled.", font, _GRAY)
         return img
 
     train_no = train.get("train_no")
@@ -57,15 +57,15 @@ def _make_base(train, font, size):
     status   = train.get("status") or ""
 
     if train_no:
-        _text(draw, (2, 12), f"Train {train_no}", font, _WHITE)
-        _text(draw, (2, 24), f"Dep: {depart}",   font, _WHITE)
-        _text(draw, (2, 36), f"Arr: {arrive}",   font, _WHITE)
-        _text(draw, (2, 48), _fit(draw, status, font, w - 4),
+        _text(draw, (2, 20), f"Train {train_no}", font, _WHITE)
+        _text(draw, (2, 32), f"Dep: {depart}",   font, _WHITE)
+        _text(draw, (2, 44), f"Arr: {arrive}",   font, _WHITE)
+        _text(draw, (2, 54), _fit(draw, status, font, w - 4),
               font, _status_color(status))
     else:
-        _text(draw, (2, 12), f"Dep: {depart}", font, _WHITE)
-        _text(draw, (2, 24), f"Arr: {arrive}", font, _WHITE)
-        _text(draw, (2, 36), _fit(draw, status, font, w - 4),
+        _text(draw, (2, 20), f"Dep: {depart}", font, _WHITE)
+        _text(draw, (2, 32), f"Arr: {arrive}", font, _WHITE)
+        _text(draw, (2, 44), _fit(draw, status, font, w - 4),
               font, _status_color(status))
 
     return img
