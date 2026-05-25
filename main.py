@@ -26,11 +26,12 @@ def _show_slide(display, frames, duration):
 
 
 def _fetch_all(config):
-    lines = config.get("rail_lines", [])
+    lines     = config.get("rail_lines", [])
+    route_ids = config.get("alerts", {}).get("route_ids", [])
     return {
-        "rail": [fetch_rail(line) for line in lines],
+        "rail":   [fetch_rail(line) for line in lines],
         "subway": fetch_subway(config.get("subway", {})),
-        "alerts": fetch_alerts(lines),
+        "alerts": fetch_alerts(route_ids),
     }
 
 
@@ -43,12 +44,15 @@ def _build_slides(config, data):
     slides = [([logo.render()], t_logo)]
 
     for line_data in data["rail"]:
+        origin = line_data.get("origin", line_data["name"])
+        dest   = line_data.get("destination", "")
+        header = f"{origin} > {dest}" if dest else origin
         trains = line_data.get("trains", [])
         if not trains:
-            slides.append((rail.render(line_data["name"], None), t_train))
+            slides.append((rail.render(header, None), t_train))
         else:
             for train in trains:
-                slides.append((rail.render(line_data["name"], train), t_train))
+                slides.append((rail.render(header, train), t_train))
 
     sub = data["subway"]
     if sub.get("northbound"):

@@ -6,11 +6,26 @@ _WHITE   = (255, 255, 255)
 _GRAY    = (120, 120, 120)
 _DIVIDER = (60, 60, 80)
 
-# 6x10 font: 6px/char — these labels stay within 64px
-_LABELS = {
-    "northbound": "NB Fern Rk",   # 10 x 6 = 60px
-    "southbound": "SB AT&T",       #  7 x 6 = 42px
+_DEFAULT_LABELS = {
+    "northbound": "NB Fern Rk",
+    "southbound": "SB NRG",
 }
+
+
+def _text(draw, xy, text, font, fill):
+    """Draw text twice with 1px horizontal offset for a bolder stroke."""
+    x, y = xy
+    draw.text((x, y), text, font=font, fill=fill)
+    draw.text((x + 1, y), text, font=font, fill=fill)
+
+
+def _line_color(route_id):
+    rid = (route_id or "").upper()
+    if rid.startswith("B"):
+        return (255, 140, 0)   # BSL orange
+    if rid.startswith("M"):
+        return (0, 102, 204)   # MFL blue
+    return (0, 200, 50)        # trolley / fallback green
 
 
 def _upcoming(times):
@@ -34,20 +49,24 @@ def render(data, direction, size=(64, 64)):
     font_lg, font_md, font_sm = _load_fonts()
     w, _ = size
 
-    label = _LABELS.get(direction, direction.upper())
+    route_id = data.get("route_id", "")
+    color    = _line_color(route_id)
+    labels   = data.get("labels", _DEFAULT_LABELS)
+    label    = labels.get(direction, direction.upper())
+
     label_w = draw.textbbox((0, 0), label, font=font_md)[2]
-    draw.text((max(2, (w - label_w) // 2), 2), label, font=font_md, fill=_WHITE)
+    _text(draw, (max(2, (w - label_w) // 2), 2), label, font_md, color)
     draw.line([(0, 14), (w - 1, 14)], fill=_DIVIDER)
 
     times = _upcoming(data.get(direction, []))
     if not times:
-        draw.text((2, 20), "No upcoming", font=font_sm, fill=_GRAY)
-        draw.text((2, 30), "departures.", font=font_sm, fill=_GRAY)
+        _text(draw, (2, 20), "No upcoming", font_sm, _GRAY)
+        _text(draw, (2, 30), "departures.", font_sm, _GRAY)
         return img
 
     y = 18
     for t in times:
-        draw.text((2, y), t, font=font_lg, fill=_WHITE)
+        _text(draw, (2, y), t, font_lg, _WHITE)
         y += 16
 
     return img

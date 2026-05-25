@@ -20,25 +20,29 @@ logo.render().save(OUT / "logo.png")
 print("logo.png")
 
 for line in cfg.get("rail_lines", []):
-    data = fetch_rail(line)
+    data   = fetch_rail(line)
+    origin = data.get("origin", line["name"])
+    dest   = data.get("destination", "")
+    header = f"{origin} > {dest}" if dest else origin
+    slug   = line["name"].lower()
     trains = data.get("trains", [])
     if not trains:
-        frames = rail.render(line["name"], None)
-        frames[0].save(OUT / f"rail_{line['name'].lower()}_no_service.png")
-        print(f"rail_{line['name'].lower()}_no_service.png")
+        frames = rail.render(header, None)
+        frames[0].save(OUT / f"rail_{slug}_no_service.png")
+        print(f"rail_{slug}_no_service.png")
     else:
         for i, train in enumerate(trains):
-            frames = rail.render(line["name"], train)
-            frames[0].save(OUT / f"rail_{line['name'].lower()}_{i}_frame0.png")
-            frames[len(frames)//2].save(OUT / f"rail_{line['name'].lower()}_{i}_mid.png")
-            print(f"rail_{line['name'].lower()} train {i}: {len(frames)} frames")
+            frames = rail.render(header, train)
+            frames[0].save(OUT / f"rail_{slug}_{i}_frame0.png")
+            frames[len(frames)//2].save(OUT / f"rail_{slug}_{i}_mid.png")
+            print(f"rail_{slug} train {i}: {len(frames)} frames")
 
 sub = fetch_subway(cfg.get("subway", {}))
 subway.render(sub, "northbound").save(OUT / "subway_nb.png")
 subway.render(sub, "southbound").save(OUT / "subway_sb.png")
 print(f"subway_nb.png, subway_sb.png")
 
-alert_list = fetch_alerts(cfg.get("rail_lines", []))
+alert_list = fetch_alerts(cfg.get("alerts", {}).get("route_ids", []))
 if alert_list:
     pages = alerts.render(alert_list)
     for i, img in enumerate(pages):

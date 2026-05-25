@@ -1,23 +1,15 @@
 import requests
 from google.transit import gtfs_realtime_pb2
-from data.gtfs import load_rail
 
 ALERTS_URL = "https://www3.septa.org/gtfsrt/septarail-pa-us/Service/rtServiceAlerts.pb"
 
 
-def fetch_alerts(lines):
+def fetch_alerts(route_ids):
     """
-    lines: list of {name, origin, destination, route_id}
-    Returns: deduplicated list of alert strings relevant to any configured line
+    route_ids: list of route ID strings to filter alerts for (e.g. ["NOR", "B1"])
+    Returns: deduplicated list of alert strings relevant to any configured route
     """
-    route_ids = {line["route_id"] for line in lines if line.get("route_id")}
-    stop_names = set()
-    for line in lines:
-        stop_names.add(line["origin"])
-        stop_names.add(line["destination"])
-
-    gtfs = load_rail()
-    stop_lookup = gtfs["stop_lookup"]
+    route_ids = set(route_ids or [])
 
     try:
         resp = requests.get(ALERTS_URL, timeout=10)
@@ -43,9 +35,7 @@ def fetch_alerts(lines):
             continue
 
         for ie in entity.alert.informed_entity:
-            if (ie.route_id and ie.route_id in route_ids) or (
-                ie.stop_id and stop_lookup.get(ie.stop_id) in stop_names
-            ):
+            if ie.route_id and ie.route_id in route_ids:
                 if desc not in seen:
                     seen.add(desc)
                     alerts.append(desc)
@@ -59,6 +49,6 @@ if __name__ == "__main__":
     import yaml
 
     cfg = yaml.safe_load(open("config.yaml"))
-    lines = cfg.get("rail_lines", [])
-    alerts = fetch_alerts(lines)
-    print(json.dumps(alerts, indent=2))
+    route_ids = cfg.get("alerts", {}).get("route_ids", [])
+    result = fetch_alerts(route_ids)
+    print(json.dumps(result, indent=2))

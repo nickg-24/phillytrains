@@ -7,6 +7,13 @@ _DIVIDER = (60, 60, 80)
 _MAX_LINES = 4
 
 
+def _text(draw, xy, text, font, fill):
+    """Draw text twice with 1px horizontal offset for a bolder stroke."""
+    x, y = xy
+    draw.text((x, y), text, font=font, fill=fill)
+    draw.text((x + 1, y), text, font=font, fill=fill)
+
+
 def _wrap(draw, text, font, max_px):
     words = text.split()
     lines, line = [], ""
@@ -26,11 +33,11 @@ def _page(lines, font_md, font_sm, size):
     w, _ = size
     img = Image.new("RGB", size, (0, 0, 0))
     draw = ImageDraw.Draw(img)
-    draw.text((2, 2), "ALERT", font=font_md, fill=_YELLOW)
+    _text(draw, (2, 2), "ALERT", font_md, _YELLOW)
     draw.line([(0, 14), (w - 1, 14)], fill=_DIVIDER)
     y = 17
     for line in lines[:_MAX_LINES]:
-        draw.text((2, y), line, font=font_sm, fill=_WHITE)
+        _text(draw, (2, y), line, font_sm, _WHITE)
         y += 10
     return img
 

@@ -11,6 +11,14 @@ subway:
   stops:
     northbound: "32139"
     southbound: "1283"
+  labels:
+    northbound: "NB Fern Rk"
+    southbound: "SB NRG"
+
+alerts:
+  route_ids:
+    - "NOR"
+    - "B1"
 
 debug: 1
 refresh_interval: 60

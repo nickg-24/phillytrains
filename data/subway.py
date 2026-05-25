@@ -26,7 +26,9 @@ def fetch_subway(config):
     today = datetime.date.today()
 
     return {
-        "station": config["station"],
+        "station":    config["station"],
+        "route_id":   config.get("route_id", ""),
+        "labels":     config.get("labels", {}),
         "northbound": _departures_for_stop(gtfs, nb_stop, today),
         "southbound": _departures_for_stop(gtfs, sb_stop, today),
     }
