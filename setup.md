@@ -132,9 +132,9 @@ sudo systemctl status phillytrains
 sudo journalctl -u phillytrains -f
 ```
 
-The first run downloads GTFS data — expect ~15 seconds before the first slide appears.
+The first run downloads GTFS data from SEPTA — on a Pi 3 this takes **60–90 seconds** before anything appears on the matrix. Subsequent boots are the same since the data isn't cached. This is normal.
 
-On subsequent boots the service starts automatically. If the network isn't ready yet when the Pi boots, the service will retry every 15 seconds until it connects.
+On every boot the service starts automatically. If the network isn't ready yet, the service retries every 15 seconds until it connects.
 
 ---
 

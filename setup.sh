@@ -68,6 +68,7 @@ sudo tee /etc/systemd/system/${SERVICE}.service > /dev/null <<EOF
 Description=PhillyTrains LED Display
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
@@ -76,7 +77,6 @@ WorkingDirectory=$PROJECT_DIR
 ExecStart=$PYTHON -u $PROJECT_DIR/main.py
 Restart=always
 RestartSec=15
-StartLimitIntervalSec=0
 
 [Install]
 WantedBy=multi-user.target

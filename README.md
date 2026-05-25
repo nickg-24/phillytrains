@@ -73,3 +73,7 @@ All data is from SEPTA's open developer program:
 
 - [hzeller/rpi-rgb-led-matrix](https://github.com/hzeller/rpi-rgb-led-matrix) for LED matrix control
 - [SEPTA Developer Program](https://www3.septa.org/developer/) for transit data
+
+---
+
+This project was revamped using [loopdehoot](https://github.com/nickg-24/loopdehoot), an AI-assisted development tool I'm working on. Not sure it's any more effective than just using Claude Code directly, but it was fun to put together.
