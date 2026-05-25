@@ -1,88 +1,75 @@
 # PhillyTrains – SEPTA LED Matrix Display
 
-This project uses a Raspberry Pi and RGB LED matrix to show live SEPTA Regional Rail information for a selected origin and destination.
-It pulls data from SEPTA’s public APIs and displays upcoming trains, delays, and service alerts in a rotating format.
-
-See **[SETUP.md](./setup.md)** for instructions on installing dependencies and configuring the board.
+A Raspberry Pi project that shows live SEPTA transit data on a 64×64 RGB LED matrix. Displays upcoming Regional Rail departures, Broad Street Line times, and service alerts in a rotating slideshow — starts automatically on boot, no interaction required.
 
 ---
 
 ## Preview
 
 <p align="center">
-  <img src="images/slide1.jpg" width="200" alt="Slide 1: SEPTA Logo">
-  <img src="images/slide2.jpg" width="200" alt="Slide 2: Train View">
-  <img src="images/slide3.jpg" width="200" alt="Slide 3: Train View">
-  <img src="images/slide4.jpg" width="200" alt="Slide 4: Alert View">
+  <img src="images/slide1.jpg" width="200" alt="SEPTA Logo slide">
+  <img src="images/slide2.jpg" width="200" alt="Train departure slide">
+  <img src="images/slide3.jpg" width="200" alt="Train departure slide">
+  <img src="images/slide4.jpg" width="200" alt="Alert slide">
 </p>
-
-<p align="center">
-  <em>Slide 1: SEPTA Logo • Slide 2–3: Train View • Slide 4: Alert View</em>
-</p>
-
-
-## Overview
-
-The project combines:
-
-* A **Raspberry Pi** running Python scripts to collect and process real-time train data.
-* An **RGB LED matrix** that displays train schedules and alerts.
-* SEPTA’s **Next To Arrive** and **GTFS Realtime** feeds for live updates.
-
-Once powered on, the display:
-
-1. Fetches current train schedules and delay data from SEPTA.
-2. Shows the next few departures between the configured stations.
-3. Rotates through service alerts and updates automatically every few minutes.
-
-The board runs after boot, no manual refresh or interaction required.
 
 ---
 
 ## Hardware
 
-All components are off-the-shelf and easy to find.
-Here are the main parts used:
+| Part | Link |
+|------|------|
+| Raspberry Pi 3 Model B+ | — |
+| Adafruit RGB Matrix Bonnet | [adafruit.com/product/3211](https://www.adafruit.com/product/3211) |
+| 64×64 RGB LED Matrix (3mm pitch) | [adafruit.com/product/4732](https://www.adafruit.com/product/4732) |
+| 5V 4A power supply | [adafruit.com/product/1466](https://www.adafruit.com/product/1466) |
 
-* **Raspberry Pi 3 Model B+**
-* [**Adafruit RGB Matrix Bonnet**](https://www.adafruit.com/product/3211)
-* [**64x64 RGB LED Matrix - 3mm Pitch - 192mm x 192mm**](https://www.adafruit.com/product/4732)
-* [**5 V 4 A power supply**](https://www.adafruit.com/product/1466)
-
-Refer to [this guide](https://learn.adafruit.com/adafruit-rgb-matrix-bonnet-for-raspberry-pi/overview) for help setting up the LED matrix.
-
----
-
-## Data Sources
-
-This project uses open data from SEPTA:
-
-* **Next To Arrive API:** [https://www3.septa.org/api/NextToArrive/](https://www3.septa.org/api/NextToArrive/)
-* **GTFS Realtime Service Alerts:** [https://www3.septa.org/gtfsrt/septarail-pa-us/Service/rtServiceAlerts.pb](https://www3.septa.org/gtfsrt/septarail-pa-us/Service/rtServiceAlerts.pb)
-* **Static GTFS Schedule Data:** [https://www3.septa.org/developer/gtfs_public.zip](https://www3.septa.org/developer/gtfs_public.zip)
+Adafruit's [RGB Matrix Bonnet guide](https://learn.adafruit.com/adafruit-rgb-matrix-bonnet-for-raspberry-pi/overview) covers wiring and physical setup.
 
 ---
 
-## How It Works
+## What it shows
 
-* **`fetch_data.py`** collects current train and alert data from SEPTA’s APIs.
-* **`matrix_control.py`** renders that data on the LED matrix in a continuous slideshow loop.
-* **`config.yaml`** defines station names, display brightness, and refresh timing.
-* The system starts automatically on boot.
+- **Regional Rail** — next departures between your configured stations, with train number, departure time, arrival time, and on-time status
+- **Broad Street Line** — next northbound and southbound departures from your stop
+- **Service alerts** — filtered to your configured routes, paginated across the display
+
+Everything is configured in `config.yaml` — no code changes needed to track different stations or lines.
+
+---
+
+## Setup
+
+See **[setup.md](./setup.md)** for full instructions. The short version:
+
+1. Flash Raspberry Pi OS Lite (64-bit) with Wi-Fi and SSH configured
+2. Clone the repo and edit `config.yaml` for your stops
+3. Run `bash setup.sh`
+4. Reboot, verify hardware with `test_matrix.py`, then start the service
+
+---
+
+## How it works
+
+- `main.py` — main loop: fetches data, builds slides, drives the display at ~30 fps
+- `data/` — fetches from SEPTA's Next To Arrive API, GTFS Realtime alerts feed, and static GTFS schedule (fallback when live data is unavailable)
+- `display/panels/` — renders each slide type (rail, subway, alerts, logo) as a PIL image
+- `display/matrix.py` — thin wrapper around `rpi-rgb-led-matrix`; falls back to a no-op when running without hardware (useful for development)
+- `config.yaml` — all user configuration: stations, routes, display timing, matrix settings
+
+---
+
+## Data sources
+
+All data is from SEPTA's open developer program:
+
+- [Next To Arrive API](https://www3.septa.org/api/NextToArrive/)
+- [GTFS Realtime Service Alerts](https://www3.septa.org/gtfsrt/septarail-pa-us/Service/rtServiceAlerts.pb)
+- [Static GTFS Schedule](https://www3.septa.org/developer/gtfs_public.zip)
 
 ---
 
 ## Credits
 
-Built using:
-
-* [hzeller/rpi-rgb-led-matrix](https://github.com/hzeller/rpi-rgb-led-matrix) for LED control
-
-* [SEPTA Developer Program](https://www3.septa.org/developer/) for transit data
-
-
-
-
-
-
-
+- [hzeller/rpi-rgb-led-matrix](https://github.com/hzeller/rpi-rgb-led-matrix) for LED matrix control
+- [SEPTA Developer Program](https://www3.septa.org/developer/) for transit data
