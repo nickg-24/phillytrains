@@ -7,11 +7,13 @@
 Use **Raspberry Pi OS Lite (64-bit)** — the headless version without a desktop.
 Flash it with [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
 
-In the Imager's advanced settings before flashing:
+PhillyTrains requires internet access at runtime to fetch live SEPTA data. Configure your network **during imaging** — it's the easiest point to do it and avoids needing a monitor or keyboard later.
+
+In the Imager's advanced settings (click the gear icon) before flashing:
 - Set a **hostname** (e.g. `phillytrains`)
 - Enable **SSH**
 - Set a **username and password**
-- Configure **Wi-Fi** if not using ethernet
+- Set your **Wi-Fi SSID and password** (or use ethernet — either works)
 
 Boot the Pi and SSH in:
 
@@ -131,6 +133,8 @@ sudo journalctl -u phillytrains -f
 ```
 
 The first run downloads GTFS data — expect ~15 seconds before the first slide appears.
+
+On subsequent boots the service starts automatically. If the network isn't ready yet when the Pi boots, the service will retry every 15 seconds until it connects.
 
 ---
 

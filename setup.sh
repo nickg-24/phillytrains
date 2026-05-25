@@ -75,7 +75,8 @@ User=root
 WorkingDirectory=$PROJECT_DIR
 ExecStart=$PYTHON -u $PROJECT_DIR/main.py
 Restart=always
-RestartSec=10
+RestartSec=15
+StartLimitIntervalSec=0
 
 [Install]
 WantedBy=multi-user.target
