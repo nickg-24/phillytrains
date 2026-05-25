@@ -4,16 +4,16 @@
 
 ## 1. Flash the OS
 
-Use **Raspberry Pi OS Lite (64-bit)** — the headless version without desktop.
+Use **Raspberry Pi OS Lite (64-bit)** — the headless version without a desktop.
 Flash it with [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
 
-In the Imager's advanced settings (gear icon) before flashing:
+In the Imager's advanced settings before flashing:
 - Set a **hostname** (e.g. `phillytrains`)
 - Enable **SSH**
 - Set a **username and password**
 - Configure **Wi-Fi** if not using ethernet
 
-After flashing, boot the Pi and SSH in:
+Boot the Pi and SSH in:
 
 ```bash
 ssh <your-username>@phillytrains.local
@@ -23,8 +23,6 @@ ssh <your-username>@phillytrains.local
 
 ## 2. Clone the repo
 
-Git is pre-installed on Pi OS:
-
 ```bash
 git clone https://github.com/nickg-24/phillytrains.git ~/phillytrains
 cd ~/phillytrains
@@ -32,29 +30,79 @@ cd ~/phillytrains
 
 ---
 
-## 3. Run the setup script
+## 3. Configure your stops
 
-`setup.sh` automates everything from here:
+Edit `config.yaml` before running setup. At minimum, update `rail_lines` and `subway` for your commute.
+
+**Rail lines** — one entry per origin/destination pair you want to track:
+
+```yaml
+rail_lines:
+  - name: "Suburban"
+    origin: "Suburban Station"
+    destination: "Conshohocken"
+    route_id: "NOR"
+    n: 2
+```
+
+`origin` and `destination` must exactly match SEPTA stop names. To look one up, run:
+
+```bash
+python3 -c "
+import requests, zipfile, io, csv
+z = zipfile.ZipFile(io.BytesIO(requests.get('https://www3.septa.org/developer/gtfs_public.zip').content))
+r = zipfile.ZipFile(io.BytesIO(z.read('google_rail.zip')))
+for row in csv.DictReader(io.TextIOWrapper(r.open('stops.txt'), 'utf-8')):
+    print(row['stop_name'])
+"
+```
+
+`route_id` is the SEPTA route code (e.g. `NOR` for Norristown/Manayunk, `LAN` for Lansdale/Doylestown). `n` is how many upcoming trains to show.
+
+**Subway** — BSL stop IDs for your station. To find your stop IDs, run:
+
+```bash
+python3 -c "
+import requests, zipfile, io, csv
+z = zipfile.ZipFile(io.BytesIO(requests.get('https://www3.septa.org/developer/gtfs_public.zip').content))
+b = zipfile.ZipFile(io.BytesIO(z.read('google_bus.zip')))
+for row in csv.DictReader(io.TextIOWrapper(b.open('stops.txt'), 'utf-8')):
+    if 'your station' in row['stop_name'].lower():
+        print(row['stop_id'], ':', row['stop_name'])
+"
+```
+
+Replace `'your station'` with your station name. Set `route_id` to `B1` for BSL, `MFL` for Market-Frankford, or your trolley route.
+
+**Alerts** — list the route IDs you want service alerts for:
+
+```yaml
+alerts:
+  route_ids:
+    - "NOR"
+    - "B1"
+```
+
+---
+
+## 4. Run the setup script
 
 ```bash
 bash setup.sh
 ```
 
 It will:
-1. Install build dependencies (`python3-dev`, `python3-venv`, `cython3`)
-2. Disable the Pi audio driver (required — shared hardware with the matrix)
-3. Create a virtual environment and install all Python dependencies
-4. Install `rpi-rgb-led-matrix` via pip (compiles C++ — takes a few minutes)
-5. Verify the import works
-6. Install and enable the `phillytrains` systemd service
+1. Install build dependencies
+2. Disable the Pi audio driver (required — shares hardware with the matrix)
+3. Create a Python virtual environment and install all dependencies
+4. Build and install `rpi-rgb-led-matrix` (compiles C++ — takes a few minutes)
+5. Install and enable the `phillytrains` systemd service
 
-At the end it will prompt you to reboot if the audio change requires one.
+Reboot if prompted.
 
 ---
 
-## 4. Verify the hardware
-
-After rebooting, run the smoke test:
+## 5. Verify the hardware
 
 ```bash
 sudo .venv/bin/python3 test_matrix.py
@@ -63,13 +111,13 @@ sudo .venv/bin/python3 test_matrix.py
 The matrix should light up **solid blue**. Press Ctrl+C to stop.
 
 If nothing lights up:
-- Check the ribbon cable and the 5V power supply connection to the matrix
-- If it lights up but flickers, re-check that audio was disabled (Step 3 handles this, but verify with `grep audio /boot/firmware/config.txt`)
-- If the matrix init fails, try changing `hardware_mapping` in `config.yaml` from `"adafruit-hat"` to `"adafruit-hat-pwm"`
+- Check the ribbon cable and 5V power supply to the matrix
+- If it flickers, confirm audio is disabled: `grep audio /boot/firmware/config.txt`
+- If matrix init fails, try changing `hardware_mapping` in `config.yaml` from `"adafruit-hat"` to `"adafruit-hat-pwm"`
 
 ---
 
-## 5. Start the display
+## 6. Start the display
 
 ```bash
 sudo systemctl start phillytrains
@@ -82,11 +130,11 @@ sudo systemctl status phillytrains
 sudo journalctl -u phillytrains -f
 ```
 
-The first run downloads GTFS data (~15 seconds before the first slide appears).
+The first run downloads GTFS data — expect ~15 seconds before the first slide appears.
 
 ---
 
-## 6. Pushing updates from your laptop
+## Pushing updates
 
 On your laptop:
 
@@ -98,34 +146,5 @@ git push
 On the Pi:
 
 ```bash
-cd ~/phillytrains
-git pull
-sudo systemctl restart phillytrains
-```
-
----
-
-## Manual setup (reference)
-
-If you prefer not to use `setup.sh`, here are the individual steps:
-
-```bash
-# Build deps
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y python3-dev python3-venv python3-pil cython3
-
-# Disable audio — edit /boot/firmware/config.txt (Bookworm) or /boot/config.txt (Bullseye)
-# Change: dtparam=audio=on  →  dtparam=audio=off
-# Then reboot.
-
-# Venv + deps
-python3 -m venv .venv
-.venv/bin/pip install --upgrade pip
-.venv/bin/pip install -r requirements.txt
-.venv/bin/pip install git+https://github.com/hzeller/rpi-rgb-led-matrix
-
-# Verify
-.venv/bin/python3 -c "from rgbmatrix import RGBMatrix; print('OK')"
-
-# Systemd service: see setup.sh for the service file template
+cd ~/phillytrains && git pull && sudo systemctl restart phillytrains
 ```

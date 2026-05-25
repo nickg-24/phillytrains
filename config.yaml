@@ -25,7 +25,6 @@ alerts:
     - "NOR"
     - "B1"
 
-debug: 1
 refresh_interval: 60
 
 matrix:

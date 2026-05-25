@@ -1,5 +1,7 @@
-foo.md
 .venv/
-foo.py
-logs
-__pycache__
+__pycache__/
+*.pyc
+*.pyo
+preview_output/
+.claude/
+logs/
