@@ -68,8 +68,55 @@ def bat():
     return img
 
 
+def cat():
+    img = Image.new("RGB", (64, 64), (10, 10, 40))
+    d = ImageDraw.Draw(img)
+    # Moon
+    d.ellipse((42, 6, 58, 22), fill=(255, 240, 150))
+    # Silhouette: body, head, ears, tail, legs
+    d.ellipse((14, 34, 44, 56), fill=BLACK)
+    d.ellipse((17, 20, 35, 40), fill=BLACK)
+    d.polygon([(19, 26), (20, 13), (27, 22)], fill=BLACK)
+    d.polygon([(27, 22), (34, 13), (35, 26)], fill=BLACK)
+    d.line([(42, 50), (54, 44), (57, 30)], fill=BLACK, width=3)
+    d.rectangle((18, 50, 22, 58), fill=BLACK)
+    d.rectangle((36, 50, 40, 58), fill=BLACK)
+    # Glowing green eyes
+    d.ellipse((21, 27, 25, 31), fill=(120, 255, 80))
+    d.ellipse((27, 27, 31, 31), fill=(120, 255, 80))
+    return img
+
+
+def candy_corn():
+    img = Image.new("RGB", (64, 64), BLACK)
+    d = ImageDraw.Draw(img)
+    # Three colored bands: white tip, orange middle, yellow base
+    d.polygon([(32, 6), (42, 24), (22, 24)], fill=(255, 255, 255))
+    d.polygon([(22, 24), (42, 24), (44, 40), (20, 40)], fill=ORANGE)
+    d.polygon([(20, 40), (44, 40), (40, 56), (24, 56)], fill=(255, 220, 0))
+    return img
+
+
+def skull():
+    img = Image.new("RGB", (64, 64), BLACK)
+    d = ImageDraw.Draw(img)
+    bone = (230, 225, 210)
+    # Cranium and jaw
+    d.ellipse((14, 8, 50, 44), fill=bone)
+    d.rectangle((22, 38, 42, 52), fill=bone)
+    # Eye sockets and nose
+    d.ellipse((20, 22, 30, 34), fill=BLACK)
+    d.ellipse((34, 22, 44, 34), fill=BLACK)
+    d.polygon([(29, 36), (35, 36), (32, 42)], fill=BLACK)
+    # Teeth
+    for x in (27, 32, 37):
+        d.line([(x, 44), (x, 52)], fill=BLACK, width=1)
+    return img
+
+
 if __name__ == "__main__":
-    for name, fn in [("pumpkin", pumpkin), ("ghost", ghost), ("bat", bat)]:
+    for name, fn in [("pumpkin", pumpkin), ("ghost", ghost), ("bat", bat),
+                     ("cat", cat), ("candy_corn", candy_corn), ("skull", skull)]:
         path = OUT / f"{name}.png"
         fn().save(path)
         print(f"wrote {path}")

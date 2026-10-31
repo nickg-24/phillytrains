@@ -3,8 +3,10 @@ import zipfile
 import io
 import csv
 import datetime
+from pathlib import Path
 
 GTFS_URL = "https://www3.septa.org/developer/gtfs_public.zip"
+_CACHE_FILE = Path(__file__).resolve().parents[1] / "cache" / "gtfs_public.zip"
 
 _outer_bytes = None
 _rail_data = None
@@ -12,10 +14,26 @@ _subway_data = None
 
 
 def _get_outer_zip():
+    """Download the SEPTA GTFS zip and save a copy to disk.
+
+    If the download fails (e.g. Wi-Fi is down), use the saved copy instead.
+    """
     global _outer_bytes
     if _outer_bytes is None:
-        resp = requests.get(GTFS_URL, timeout=30)
-        _outer_bytes = resp.content
+        try:
+            resp = requests.get(GTFS_URL, timeout=30)
+            resp.raise_for_status()
+            _outer_bytes = resp.content
+            try:
+                _CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+                _CACHE_FILE.write_bytes(_outer_bytes)
+            except OSError as e:
+                print(f"[gtfs] could not save cache: {e}", flush=True)
+        except requests.RequestException as e:
+            if not _CACHE_FILE.exists():
+                raise
+            print(f"[gtfs] download failed ({e}); using saved schedule", flush=True)
+            _outer_bytes = _CACHE_FILE.read_bytes()
     return zipfile.ZipFile(io.BytesIO(_outer_bytes))
 
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import os
+import threading
 import time
+import traceback
 from pathlib import Path
 import yaml
 
@@ -19,6 +21,9 @@ _FRAME_DELAY = 0.033  # ~30 fps
 # Checked after every slide, so no restart is needed. See tools/halloween.sh.
 _HALLOWEEN_FLAG = Path(__file__).resolve().parent / "halloween.on"
 
+# Latest slide list, replaced by the refresh thread. The display loop only reads it.
+_slides = None
+
 
 def _halloween_on():
     return _HALLOWEEN_FLAG.exists()
@@ -34,14 +39,28 @@ def _show_slide(display, frames, duration):
         i += 1
 
 
-def _fetch_all(config):
+def _fetch_all(config, previous):
+    """Fetch each source on its own. A failed source keeps its last good data."""
     lines     = config.get("rail_lines", [])
     route_ids = config.get("alerts", {}).get("route_ids", [])
-    return {
-        "rail":   [fetch_rail(line) for line in lines],
-        "subway": fetch_subway(config.get("subway", {})),
-        "alerts": fetch_alerts(route_ids),
-    }
+    data = dict(previous)
+
+    try:
+        data["rail"] = [fetch_rail(line) for line in lines]
+    except Exception as e:
+        print(f"[refresh] rail failed, keeping last data: {e}", flush=True)
+
+    try:
+        data["subway"] = fetch_subway(config.get("subway", {}))
+    except Exception as e:
+        print(f"[refresh] subway failed, keeping last data: {e}", flush=True)
+
+    try:
+        data["alerts"] = fetch_alerts(route_ids)
+    except Exception as e:
+        print(f"[refresh] alerts failed, keeping last data: {e}", flush=True)
+
+    return data
 
 
 def _build_slides(config, data):
@@ -75,31 +94,48 @@ def _build_slides(config, data):
     return slides
 
 
+def _refresh_forever(config, interval):
+    """Runs in a background thread so network waits never freeze the display."""
+    global _slides
+    data = {"rail": [], "subway": {}, "alerts": []}
+    while True:
+        try:
+            data = _fetch_all(config, data)
+            _slides = _build_slides(config, data)
+        except Exception:
+            print("[refresh] unexpected error, will retry:", flush=True)
+            traceback.print_exc()
+        time.sleep(interval)
+
+
 def main():
     config = yaml.safe_load(open("config.yaml"))
     display = MatrixDisplay(config.get("matrix", {}))
     refresh_interval = config.get("refresh_interval", 60)
 
+    t_logo    = config.get("display", {}).get("logo", 5)
+    logo_only = [([logo.render()], t_logo)]
+
     hw_cfg      = config.get("halloween", {})
     hw_frames   = halloween.load_images(hw_cfg.get("dir", "images/halloween"))
     hw_duration = hw_cfg.get("duration", 3)
+    hw_every    = max(1, hw_cfg.get("every", 4))
     hw_index    = 0
+    shown       = 0
 
-    data = _fetch_all(config)
-    slides = _build_slides(config, data)
-    last_refresh = time.time()
+    threading.Thread(
+        target=_refresh_forever, args=(config, refresh_interval), daemon=True
+    ).start()
 
     try:
         while True:
-            if time.time() - last_refresh >= refresh_interval:
-                data = _fetch_all(config)
-                slides = _build_slides(config, data)
-                last_refresh = time.time()
-
-            for frames, duration in slides:
+            # Until the first fetch finishes (or if the network is down at boot),
+            # the logo keeps the display alive.
+            for frames, duration in (_slides or logo_only):
                 _show_slide(display, frames, duration)
+                shown += 1
 
-                if hw_frames and _halloween_on():
+                if hw_frames and shown % hw_every == 0 and _halloween_on():
                     _show_slide(display, [hw_frames[hw_index % len(hw_frames)]], hw_duration)
                     hw_index += 1
 

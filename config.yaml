@@ -38,10 +38,11 @@ matrix:
 display:
   logo: 3
   train: 6
-  alert: 7
+  alert: 4
 
 # Halloween images are shown between slides while halloween.on exists.
 # Toggle with: bash tools/halloween.sh on|off
 halloween:
   dir: "images/halloween"
   duration: 3
+  every: 4  # show one image after every Nth slide
