@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import time
+from pathlib import Path
 import yaml
 
 # Use the OS cert store instead of certifi — avoids issues when running under sudo in a venv.
@@ -10,9 +11,17 @@ from data.rail import fetch_rail
 from data.subway import fetch_subway
 from data.alerts import fetch_alerts
 from display.matrix import MatrixDisplay
-from display.panels import logo, rail, subway, alerts
+from display.panels import logo, rail, subway, alerts, halloween
 
 _FRAME_DELAY = 0.033  # ~30 fps
+
+# Create this file to turn Halloween images on, delete it to turn them off.
+# Checked after every slide, so no restart is needed. See tools/halloween.sh.
+_HALLOWEEN_FLAG = Path(__file__).resolve().parent / "halloween.on"
+
+
+def _halloween_on():
+    return _HALLOWEEN_FLAG.exists()
 
 
 def _show_slide(display, frames, duration):
@@ -71,6 +80,11 @@ def main():
     display = MatrixDisplay(config.get("matrix", {}))
     refresh_interval = config.get("refresh_interval", 60)
 
+    hw_cfg      = config.get("halloween", {})
+    hw_frames   = halloween.load_images(hw_cfg.get("dir", "images/halloween"))
+    hw_duration = hw_cfg.get("duration", 3)
+    hw_index    = 0
+
     data = _fetch_all(config)
     slides = _build_slides(config, data)
     last_refresh = time.time()
@@ -84,6 +98,10 @@ def main():
 
             for frames, duration in slides:
                 _show_slide(display, frames, duration)
+
+                if hw_frames and _halloween_on():
+                    _show_slide(display, [hw_frames[hw_index % len(hw_frames)]], hw_duration)
+                    hw_index += 1
 
     except KeyboardInterrupt:
         print("Stopping.")

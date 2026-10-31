@@ -36,6 +36,12 @@ matrix:
   brightness: 50
 
 display:
-  logo: 5
-  train: 10
-  alert: 10
+  logo: 3
+  train: 6
+  alert: 7
+
+# Halloween images are shown between slides while halloween.on exists.
+# Toggle with: bash tools/halloween.sh on|off
+halloween:
+  dir: "images/halloween"
+  duration: 3
